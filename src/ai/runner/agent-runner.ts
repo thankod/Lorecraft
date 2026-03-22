@@ -1,3 +1,4 @@
+import { appendFileSync, writeFileSync } from 'node:fs'
 import type { ILLMProvider, LLMMessage, LLMResponse } from './llm-provider.js'
 
 export interface LLMCallLog {
@@ -15,6 +16,8 @@ export interface AgentRunnerOptions {
   timeout_ms?: number
   max_retries?: number
   base_delay_ms?: number
+  language?: string
+  debug?: boolean | string  // true = './debug.log', string = custom path
 }
 
 function simpleHash(str: string): string {
@@ -33,12 +36,31 @@ export class AgentRunner {
   private timeout: number
   private maxRetries: number
   private baseDelay: number
+  private language: string | undefined
+  private debugPath: string | null
+  private turnCounter = 0
 
   constructor(provider: ILLMProvider, options?: AgentRunnerOptions) {
     this.provider = provider
     this.timeout = options?.timeout_ms ?? 30_000
     this.maxRetries = options?.max_retries ?? 3
     this.baseDelay = options?.base_delay_ms ?? 1_000
+    this.language = options?.language
+    this.debugPath = options?.debug
+      ? typeof options.debug === 'string' ? options.debug : './debug.log'
+      : null
+    if (this.debugPath) {
+      writeFileSync(this.debugPath, `=== Lorecraft Debug Log ===\nStarted: ${new Date().toISOString()}\n\n`)
+    }
+  }
+
+  /** Call this at the start of each player turn to mark turn boundaries in the log. */
+  markTurn(turnNumber: number, playerInput?: string): void {
+    this.turnCounter = turnNumber
+    if (this.debugPath) {
+      const sep = '═'.repeat(80)
+      appendFileSync(this.debugPath, `\n${sep}\n  TURN ${turnNumber}${playerInput ? `  |  玩家输入: ${playerInput}` : ''}\n${sep}\n\n`)
+    }
   }
 
   async run(
@@ -49,6 +71,19 @@ export class AgentRunner {
     const agentType = options?.agent_type ?? 'unknown'
     const inputHash = simpleHash(JSON.stringify(messages))
     const start = Date.now()
+
+    // Inject language instruction into the first system message
+    if (this.language) {
+      const langInstruction = `IMPORTANT: All text content in your response (narrative, dialogue, descriptions, voice lines, etc.) MUST be written in ${this.language}. JSON field names remain in English, but all string values that represent in-game content must be in ${this.language}.`
+      const sysIdx = messages.findIndex((m) => m.role === 'system')
+      if (sysIdx >= 0) {
+        messages = messages.map((m, i) =>
+          i === sysIdx ? { ...m, content: m.content + '\n\n' + langInstruction } : m,
+        )
+      } else {
+        messages = [{ role: 'system', content: langInstruction }, ...messages]
+      }
+    }
 
     let lastError: Error | undefined
 
@@ -66,6 +101,8 @@ export class AgentRunner {
           status: 'success',
           timestamp: Date.now(),
         })
+
+        this.writeDebug(callId, agentType, messages, duration, response.content)
 
         return response
       } catch (err) {
@@ -90,11 +127,52 @@ export class AgentRunner {
       timestamp: Date.now(),
     })
 
+    this.writeDebug(callId, agentType, messages, duration, null, lastError?.message)
+
     throw lastError
   }
 
   getLogs(): readonly LLMCallLog[] {
     return this.logs
+  }
+
+  private writeDebug(
+    callId: string,
+    agentType: string,
+    messages: LLMMessage[],
+    durationMs: number,
+    responseContent: string | null,
+    error?: string,
+  ): void {
+    if (!this.debugPath) return
+
+    const lines: string[] = []
+    const sep = '─'.repeat(60)
+
+    lines.push(`${sep}`)
+    lines.push(`[${agentType}]  ${callId}  (${durationMs}ms)  turn=${this.turnCounter}`)
+    lines.push(`${sep}`)
+
+    for (const msg of messages) {
+      lines.push(`\n◆ ${msg.role.toUpperCase()}:`)
+      lines.push(msg.content)
+    }
+
+    if (error) {
+      lines.push(`\n✖ ERROR: ${error}`)
+    } else if (responseContent) {
+      lines.push(`\n◆ RESPONSE:`)
+      // Pretty-print JSON if possible
+      try {
+        const parsed = JSON.parse(responseContent)
+        lines.push(JSON.stringify(parsed, null, 2))
+      } catch {
+        lines.push(responseContent)
+      }
+    }
+
+    lines.push('\n')
+    appendFileSync(this.debugPath, lines.join('\n'))
   }
 
   private callWithTimeout(

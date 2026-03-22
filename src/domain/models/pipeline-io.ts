@@ -4,16 +4,8 @@ import { z } from 'zod/v4'
 // Atomic Action Types
 // ============================================================
 
-export const AtomicActionType = z.enum([
-  'MOVE_TO',
-  'SPEAK_TO',
-  'EXAMINE',
-  'GIVE',
-  'CONFRONT',
-  'WAIT',
-  'THINK',
-])
-export type AtomicActionType = z.infer<typeof AtomicActionType>
+export const AtomicActionType = z.string().transform((s) => s.toUpperCase())
+export type AtomicActionType = string
 
 export const AtomicActionSchema = z.object({
   type: AtomicActionType,
@@ -92,20 +84,18 @@ export type InsistenceState = z.infer<typeof InsistenceState>
 // ArbitrationPipeline Types
 // ============================================================
 
-export const RejectionStrategy = z.enum([
-  'NARRATIVE_ABSORB',
-  'PARTIAL_EXEC',
-  'REINTERPRET',
-])
-export type RejectionStrategy = z.infer<typeof RejectionStrategy>
-
-export const FeasibilityVerdictSchema = z.object({
+export const ArbitrationReportSchema = z.object({
   passed: z.boolean(),
-  failure_reason: z.string().nullable(),
-  rejection_strategy: RejectionStrategy.nullable(),
+  checks: z.array(z.object({
+    dimension: z.string(),
+    passed: z.boolean(),
+    reason: z.string().nullable(),
+  })),
+  drift_flag: z.boolean(),
+  rejection_narrative: z.string().nullable(),
 })
 
-export type FeasibilityVerdict = z.infer<typeof FeasibilityVerdictSchema>
+export type ArbitrationReport = z.infer<typeof ArbitrationReportSchema>
 
 export const ArbitrationResultSchema = z.object({
   passed: z.boolean(),
@@ -141,6 +131,14 @@ export const EventGeneratorOutputSchema = z.object({
 })
 
 export type EventGeneratorOutput = z.infer<typeof EventGeneratorOutputSchema>
+
+export const PacingCheckOutputSchema = z.object({
+  pacing: z.enum(['QUICK', 'NARRATIVE']),
+  max_chars: z.number().int().positive().nullable(),
+  reasoning: z.string(),
+})
+
+export type PacingCheckOutput = z.infer<typeof PacingCheckOutputSchema>
 
 export const SignalBOutputSchema = z.object({
   choice_signals: z.record(z.string(), z.number()),

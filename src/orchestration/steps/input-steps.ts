@@ -6,7 +6,7 @@ import type {
   InputPipelineOutput,
   ToneSignals,
 } from '../../domain/models/pipeline-io.js'
-import { ParsedIntentSchema, AtomicActionType } from '../../domain/models/pipeline-io.js'
+import { ParsedIntentSchema } from '../../domain/models/pipeline-io.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
 
 // ============================================================
@@ -66,15 +66,24 @@ export class InputParserStep implements IPipelineStep<string, ParsedIntent> {
     const systemPrompt = [
       'You are the InputParser agent for a CRPG engine.',
       'Given the player\'s raw input and game context, extract the structured intent.',
+      'Extract the player\'s intent as a single compound action. The action type is an UPPER_SNAKE_CASE verb describing the primary action (e.g. MOVE_TO, SPEAK_TO, EXAMINE, SEARCH, HIDE, ATTACK, PICK_UP, USE, OBSERVE, DODGE, FLEE — use whatever fits best). If the player describes multiple actions in one input, merge them into ONE action whose "method" field describes the full sequence.',
       'Respond with ONLY valid JSON matching the ParsedIntent schema:',
-      '{ "intent": string, "tone_signals": Record<string,number>, "atomic_actions": [{ "type": enum, "target": string|null, "method": string|null, "order": int }], "ambiguity_flags": string[] }',
+      '{ "intent": string, "tone_signals": Record<string,number>, "atomic_actions": [{ "type": string, "target": string|null, "method": string|null, "order": 0 }], "ambiguity_flags": string[] }',
+      'IMPORTANT: Always output exactly ONE atomic action with order=0.',
     ].join('\n')
+
+    const recentContext = context.data.get('recent_context') as {
+      recent_narrative?: string[]
+      known_facts?: string[]
+    } | undefined
 
     const userMessage = JSON.stringify({
       raw_text: input,
       session_id: context.session_id,
       player_character_id: context.player_character_id,
       turn_number: context.turn_number,
+      recent_narrative: recentContext?.recent_narrative?.slice(-5) ?? [],
+      known_facts: recentContext?.known_facts?.slice(-10) ?? [],
     })
 
     try {
@@ -200,8 +209,6 @@ export class AmbiguityResolverStep implements IPipelineStep<ParsedIntent, Parsed
 // Step 4: ActionValidationStep — validate action types & sort
 // ============================================================
 
-const KNOWN_ACTION_TYPES = new Set(AtomicActionType.options)
-
 export class ActionValidationStep implements IPipelineStep<ParsedIntent, ParsedIntent> {
   readonly name = 'ActionValidationStep'
 
@@ -215,20 +222,6 @@ export class ActionValidationStep implements IPipelineStep<ParsedIntent, ParsedI
           step: this.name,
           recoverable: false,
         },
-      }
-    }
-
-    for (const action of input.atomic_actions) {
-      if (!KNOWN_ACTION_TYPES.has(action.type)) {
-        return {
-          status: 'error',
-          error: {
-            code: 'UNKNOWN_ACTION_TYPE',
-            message: `Unknown action type: ${action.type}`,
-            step: this.name,
-            recoverable: false,
-          },
-        }
       }
     }
 

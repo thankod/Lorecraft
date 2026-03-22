@@ -4,348 +4,88 @@ import type { IStateStore, ILoreStore, IEventStore } from '../../infrastructure/
 import type {
   AtomicAction,
   ArbitrationResult,
-  FeasibilityVerdict,
-  RejectionStrategy,
-  ReachabilityResult,
+  ArbitrationReport,
 } from '../../domain/models/pipeline-io.js'
-import { FeasibilityVerdictSchema, ArbitrationResultSchema } from '../../domain/models/pipeline-io.js'
+import { ArbitrationReportSchema } from '../../domain/models/pipeline-io.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
 
 // ============================================================
-// Interfaces for external dependencies
-// ============================================================
-
-export interface ILocationGraph {
-  isReachable(from: string, to: string): ReachabilityResult
-}
-
-// ============================================================
-// Helper: generate rejection narrative via LLM
-// ============================================================
-
-async function generateRejectionNarrative(
-  action: AtomicAction,
-  layer: number,
-  strategy: RejectionStrategy,
-  agentRunner: AgentRunner,
-): Promise<NarrativeOutput> {
-  const systemPrompt = [
-    'You are the RejectionNarrativeGenerator for a CRPG engine.',
-    'Generate a short in-character narrative explaining why the action cannot be performed.',
-    'The rejection should feel natural within the game world, not mechanical.',
-    'Respond with ONLY valid JSON: { "narrative_text": "string" }',
-  ].join('\n')
-
-  const userMessage = JSON.stringify({
-    action,
-    failure_layer: layer,
-    rejection_strategy: strategy,
-  })
-
-  try {
-    const response = await agentRunner.run(
-      [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
-      { agent_type: 'RejectionNarrativeGenerator' },
-    )
-
-    let parsed: { narrative_text?: string }
-    try {
-      parsed = JSON.parse(response.content)
-    } catch {
-      parsed = {}
-    }
-
-    return {
-      text: parsed.narrative_text ?? 'You find yourself unable to do that.',
-      source: 'rejection',
-    }
-  } catch {
-    return {
-      text: 'You find yourself unable to do that.',
-      source: 'rejection',
-    }
-  }
-}
-
-// ============================================================
-// Step 0: ParallelQueryStep — fetch memory + world state
+// Step 0: ParallelQueryStep — fetch memory + world state + lore
 // ============================================================
 
 export class ParallelQueryStep implements IPipelineStep<AtomicAction, AtomicAction> {
   readonly name = 'ParallelQueryStep'
   private readonly stateStore: IStateStore
-
-  constructor(stateStore: IStateStore) {
-    this.stateStore = stateStore
-  }
-
-  async execute(input: AtomicAction, context: PipelineContext): Promise<StepResult<AtomicAction>> {
-    const characterId = context.player_character_id
-
-    const [subjectiveMemory, objectiveState] = await Promise.all([
-      this.stateStore.get<unknown>(`memory:subjective:${characterId}`),
-      this.stateStore.get<unknown>(`world:objective:${characterId}`),
-    ])
-
-    context.data.set('subjective_memory', subjectiveMemory)
-    context.data.set('objective_state', objectiveState)
-
-    return { status: 'continue', data: input }
-  }
-}
-
-// ============================================================
-// Layer 1: Information Completeness Check (LLM)
-// ============================================================
-
-export class Layer1InfoCheckStep implements IPipelineStep<AtomicAction, AtomicAction> {
-  readonly name = 'Layer1InfoCheckStep'
-  private readonly agentRunner: AgentRunner
-  private readonly parser = new ResponseParser(FeasibilityVerdictSchema)
-
-  constructor(agentRunner: AgentRunner) {
-    this.agentRunner = agentRunner
-  }
-
-  async execute(input: AtomicAction, context: PipelineContext): Promise<StepResult<AtomicAction>> {
-    const subjectiveMemory = context.data.get('subjective_memory')
-
-    const systemPrompt = [
-      'You are the NarrativeFeasibilityJudge for a CRPG engine (Layer 1: Information Check).',
-      'Determine if the character subjectively possesses the information needed to perform this action.',
-      'Respond with ONLY valid JSON: { "passed": boolean, "failure_reason": string|null, "rejection_strategy": "NARRATIVE_ABSORB"|"PARTIAL_EXEC"|"REINTERPRET"|null }',
-    ].join('\n')
-
-    const userMessage = JSON.stringify({
-      action: input,
-      check_layer: 1,
-      relevant_context: JSON.stringify(subjectiveMemory),
-    })
-
-    try {
-      const response = await this.agentRunner.run(
-        [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
-        { agent_type: 'NarrativeFeasibilityJudge_L1' },
-      )
-
-      const result = this.parser.parse(response.content)
-
-      if (!result.success) {
-        return {
-          status: 'error',
-          error: {
-            code: 'PARSE_FAILED',
-            message: `Layer1 parse failed: ${result.error.message}`,
-            step: this.name,
-            recoverable: false,
-          },
-        }
-      }
-
-      if (!result.data.passed) {
-        context.data.set('arbitration_failed_layer', 1)
-        const narrative = await generateRejectionNarrative(
-          input,
-          1,
-          result.data.rejection_strategy ?? 'NARRATIVE_ABSORB',
-          this.agentRunner,
-        )
-        return { status: 'short_circuit', output: narrative }
-      }
-
-      return { status: 'continue', data: input }
-    } catch (err) {
-      return {
-        status: 'error',
-        error: {
-          code: 'LLM_CALL_FAILED',
-          message: `Layer1 LLM call failed: ${err instanceof Error ? err.message : String(err)}`,
-          step: this.name,
-          recoverable: false,
-        },
-      }
-    }
-  }
-}
-
-// ============================================================
-// Layer 2: Physical / Spatial Check (pure code + LLM for text)
-// ============================================================
-
-export class Layer2PhysicalCheckStep implements IPipelineStep<AtomicAction, AtomicAction> {
-  readonly name = 'Layer2PhysicalCheckStep'
-  private readonly locationGraph: ILocationGraph
-  private readonly stateStore: IStateStore
-  private readonly agentRunner: AgentRunner
-
-  constructor(locationGraph: ILocationGraph, stateStore: IStateStore, agentRunner: AgentRunner) {
-    this.locationGraph = locationGraph
-    this.stateStore = stateStore
-    this.agentRunner = agentRunner
-  }
-
-  async execute(input: AtomicAction, context: PipelineContext): Promise<StepResult<AtomicAction>> {
-    const characterId = context.player_character_id
-
-    // Check location reachability for MOVE_TO actions
-    if (input.type === 'MOVE_TO' && input.target) {
-      const currentLocation = await this.stateStore.get<string>(`character:location:${characterId}`)
-      if (currentLocation) {
-        const reachability = this.locationGraph.isReachable(currentLocation, input.target)
-        if (!reachability.reachable) {
-          context.data.set('arbitration_failed_layer', 2)
-          const narrative = await generateRejectionNarrative(
-            input,
-            2,
-            'PARTIAL_EXEC',
-            this.agentRunner,
-          )
-          return { status: 'short_circuit', output: narrative }
-        }
-      }
-    }
-
-    // Check NPC presence for interaction actions
-    if ((input.type === 'SPEAK_TO' || input.type === 'GIVE' || input.type === 'CONFRONT') && input.target) {
-      const npcPresent = await this.stateStore.get<boolean>(`npc:present:${input.target}`)
-      if (npcPresent === false) {
-        context.data.set('arbitration_failed_layer', 2)
-        const narrative = await generateRejectionNarrative(
-          input,
-          2,
-          'NARRATIVE_ABSORB',
-          this.agentRunner,
-        )
-        return { status: 'short_circuit', output: narrative }
-      }
-    }
-
-    return { status: 'continue', data: input }
-  }
-}
-
-// ============================================================
-// Layer 3: Social / Relationship Check (LLM)
-// ============================================================
-
-export class Layer3SocialCheckStep implements IPipelineStep<AtomicAction, AtomicAction> {
-  readonly name = 'Layer3SocialCheckStep'
-  private readonly agentRunner: AgentRunner
-  private readonly parser = new ResponseParser(FeasibilityVerdictSchema)
-
-  constructor(agentRunner: AgentRunner) {
-    this.agentRunner = agentRunner
-  }
-
-  async execute(input: AtomicAction, context: PipelineContext): Promise<StepResult<AtomicAction>> {
-    const subjectiveMemory = context.data.get('subjective_memory')
-
-    const systemPrompt = [
-      'You are the NarrativeFeasibilityJudge for a CRPG engine (Layer 3: Social Check).',
-      'Determine if the current relationship state and social context allow this interaction.',
-      'Respond with ONLY valid JSON: { "passed": boolean, "failure_reason": string|null, "rejection_strategy": "NARRATIVE_ABSORB"|"PARTIAL_EXEC"|"REINTERPRET"|null }',
-    ].join('\n')
-
-    const userMessage = JSON.stringify({
-      action: input,
-      check_layer: 3,
-      relevant_context: JSON.stringify(subjectiveMemory),
-    })
-
-    try {
-      const response = await this.agentRunner.run(
-        [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
-        { agent_type: 'NarrativeFeasibilityJudge_L3' },
-      )
-
-      const result = this.parser.parse(response.content)
-
-      if (!result.success) {
-        return {
-          status: 'error',
-          error: {
-            code: 'PARSE_FAILED',
-            message: `Layer3 parse failed: ${result.error.message}`,
-            step: this.name,
-            recoverable: false,
-          },
-        }
-      }
-
-      if (!result.data.passed) {
-        context.data.set('arbitration_failed_layer', 3)
-        const narrative = await generateRejectionNarrative(
-          input,
-          3,
-          result.data.rejection_strategy ?? 'NARRATIVE_ABSORB',
-          this.agentRunner,
-        )
-        return { status: 'short_circuit', output: narrative }
-      }
-
-      return { status: 'continue', data: input }
-    } catch (err) {
-      return {
-        status: 'error',
-        error: {
-          code: 'LLM_CALL_FAILED',
-          message: `Layer3 LLM call failed: ${err instanceof Error ? err.message : String(err)}`,
-          step: this.name,
-          recoverable: false,
-        },
-      }
-    }
-  }
-}
-
-// ============================================================
-// Layer 4: Narrative Feasibility Check (LLM with extra query)
-// ============================================================
-
-export class Layer4NarrativeCheckStep implements IPipelineStep<AtomicAction, AtomicAction> {
-  readonly name = 'Layer4NarrativeCheckStep'
-  private readonly agentRunner: AgentRunner
   private readonly loreStore: ILoreStore
   private readonly eventStore: IEventStore
-  private readonly parser = new ResponseParser(FeasibilityVerdictSchema)
 
-  constructor(agentRunner: AgentRunner, loreStore: ILoreStore, eventStore: IEventStore) {
-    this.agentRunner = agentRunner
+  constructor(stateStore: IStateStore, loreStore: ILoreStore, eventStore: IEventStore) {
+    this.stateStore = stateStore
     this.loreStore = loreStore
     this.eventStore = eventStore
   }
 
   async execute(input: AtomicAction, context: PipelineContext): Promise<StepResult<AtomicAction>> {
-    // Query C: fetch lore and recent events for narrative context
-    const [loreEntries, recentEvents] = await Promise.all([
+    const characterId = context.player_character_id
+
+    const [subjectiveMemory, objectiveState, loreEntries, recentEvents] = await Promise.all([
+      this.stateStore.get<unknown>(`memory:subjective:${characterId}`),
+      this.stateStore.get<unknown>(`world:objective:${characterId}`),
       input.target ? this.loreStore.findBySubject(input.target) : Promise.resolve([]),
       this.eventStore.getAllTier1(),
     ])
 
-    const recentEventSummaries = recentEvents.slice(-10).map((e) => e.title)
-    context.data.set('query_c_lore', loreEntries)
-    context.data.set('query_c_events', recentEventSummaries)
+    context.data.set('subjective_memory', subjectiveMemory)
+    context.data.set('objective_state', objectiveState)
+    context.data.set('lore_entries', loreEntries)
+    context.data.set('recent_events', recentEvents.slice(-10).map((e) => e.title))
+
+    return { status: 'continue', data: input }
+  }
+}
+
+// ============================================================
+// FeasibilityCheckStep — single LLM call for all checks
+// ============================================================
+
+export class FeasibilityCheckStep implements IPipelineStep<AtomicAction, AtomicAction> {
+  readonly name = 'FeasibilityCheckStep'
+  private readonly agentRunner: AgentRunner
+  private readonly parser = new ResponseParser(ArbitrationReportSchema)
+
+  constructor(agentRunner: AgentRunner) {
+    this.agentRunner = agentRunner
+  }
+
+  async execute(input: AtomicAction, context: PipelineContext): Promise<StepResult<AtomicAction>> {
+    const subjectiveMemory = context.data.get('subjective_memory')
+    const objectiveState = context.data.get('objective_state')
+    const loreEntries = context.data.get('lore_entries')
+    const recentEvents = context.data.get('recent_events')
 
     const systemPrompt = [
-      'You are the NarrativeFeasibilityJudge for a CRPG engine (Layer 4: Narrative Check).',
-      'Determine if narrative preconditions are met and the action would not create logical paradoxes.',
-      'Respond with ONLY valid JSON: { "passed": boolean, "failure_reason": string|null, "rejection_strategy": "NARRATIVE_ABSORB"|"PARTIAL_EXEC"|"REINTERPRET"|null }',
+      'You are the FeasibilityJudge for a CRPG engine.',
+      'Given an action and the current game context, perform a comprehensive feasibility assessment across FIVE dimensions:',
+      '',
+      '1. **Information completeness**: Does the character subjectively possess the information needed to perform this action? (The player knowing something does NOT mean the character knows it.)',
+      '2. **Physical/spatial feasibility**: Is the action physically possible? Is the target location reachable? IMPORTANT: Items or objects not explicitly mentioned in the scene should be considered present if they are reasonable for the current environment (e.g. a tavern has tables, cups, a door; a forest has trees, rocks, bushes). Only reject if the object is clearly impossible in context.',
+      '3. **Social/relationship feasibility**: Does the current relationship state and social context allow this interaction? Is the occasion appropriate?',
+      '4. **Narrative feasibility**: Are narrative preconditions met? Would this action create logical paradoxes?',
+      '5. **Narrative drift**: Would this action cause the story to significantly derail from the main narrative arc? (This dimension NEVER causes rejection — it only flags drift.)',
+      '',
+      'If any of dimensions 1-4 fails, the overall result is NOT passed. Generate a short, in-character rejection narrative that feels natural within the game world — never expose system language to the player.',
+      'If all dimensions 1-4 pass, the overall result is passed. rejection_narrative should be null.',
+      '',
+      'Respond with ONLY valid JSON:',
+      '{ "passed": boolean, "checks": [{ "dimension": string, "passed": boolean, "reason": string|null }], "drift_flag": boolean, "rejection_narrative": string|null }',
     ].join('\n')
 
     const userMessage = JSON.stringify({
       action: input,
-      check_layer: 4,
-      lore_context: loreEntries.map((l) => ({ id: l.id, subject_ids: l.subject_ids })),
-      recent_events: recentEventSummaries,
+      subjective_memory: subjectiveMemory,
+      objective_world_state: objectiveState,
+      lore_context: loreEntries,
+      recent_events: recentEvents,
     })
 
     try {
@@ -354,7 +94,7 @@ export class Layer4NarrativeCheckStep implements IPipelineStep<AtomicAction, Ato
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
-        { agent_type: 'NarrativeFeasibilityJudge_L4' },
+        { agent_type: 'FeasibilityJudge' },
       )
 
       const result = this.parser.parse(response.content)
@@ -364,22 +104,25 @@ export class Layer4NarrativeCheckStep implements IPipelineStep<AtomicAction, Ato
           status: 'error',
           error: {
             code: 'PARSE_FAILED',
-            message: `Layer4 parse failed: ${result.error.message}`,
+            message: `FeasibilityJudge response parse failed: ${result.error.message}`,
             step: this.name,
             recoverable: false,
           },
         }
       }
 
-      if (!result.data.passed) {
-        context.data.set('arbitration_failed_layer', 4)
-        const narrative = await generateRejectionNarrative(
-          input,
-          4,
-          result.data.rejection_strategy ?? 'REINTERPRET',
-          this.agentRunner,
-        )
-        return { status: 'short_circuit', output: narrative }
+      const report = result.data
+      context.data.set('arbitration_report', report)
+      context.data.set('drift_flag', report.drift_flag)
+
+      if (!report.passed && report.rejection_narrative) {
+        return {
+          status: 'short_circuit',
+          output: {
+            text: report.rejection_narrative,
+            source: 'rejection',
+          } satisfies NarrativeOutput,
+        }
       }
 
       return { status: 'continue', data: input }
@@ -388,67 +131,11 @@ export class Layer4NarrativeCheckStep implements IPipelineStep<AtomicAction, Ato
         status: 'error',
         error: {
           code: 'LLM_CALL_FAILED',
-          message: `Layer4 LLM call failed: ${err instanceof Error ? err.message : String(err)}`,
+          message: `FeasibilityJudge LLM call failed: ${err instanceof Error ? err.message : String(err)}`,
           step: this.name,
           recoverable: false,
         },
       }
-    }
-  }
-}
-
-// ============================================================
-// Layer 5: Narrative Drift Check (LLM, never short-circuits)
-// ============================================================
-
-export class Layer5DriftCheckStep implements IPipelineStep<AtomicAction, AtomicAction> {
-  readonly name = 'Layer5DriftCheckStep'
-  private readonly agentRunner: AgentRunner
-
-  constructor(agentRunner: AgentRunner) {
-    this.agentRunner = agentRunner
-  }
-
-  async execute(input: AtomicAction, context: PipelineContext): Promise<StepResult<AtomicAction>> {
-    const systemPrompt = [
-      'You are the NarrativeFeasibilityJudge for a CRPG engine (Layer 5: Drift Check).',
-      'Assess whether this action would cause significant narrative drift.',
-      'This check NEVER blocks the action — it only flags drift for async handling.',
-      'Respond with ONLY valid JSON: { "passed": boolean, "failure_reason": string|null, "rejection_strategy": null }',
-    ].join('\n')
-
-    const userMessage = JSON.stringify({
-      action: input,
-      check_layer: 5,
-      session_id: context.session_id,
-      turn_number: context.turn_number,
-    })
-
-    try {
-      const response = await this.agentRunner.run(
-        [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
-        { agent_type: 'NarrativeFeasibilityJudge_L5' },
-      )
-
-      let driftDetected = false
-      try {
-        const parsed = JSON.parse(response.content) as { passed?: boolean }
-        driftDetected = parsed.passed === false
-      } catch {
-        // If parse fails, assume no drift
-      }
-
-      context.data.set('drift_flag', driftDetected)
-
-      // Layer 5 never short-circuits
-      return { status: 'continue', data: input }
-    } catch {
-      // On LLM failure, assume no drift and continue
-      context.data.set('drift_flag', false)
-      return { status: 'continue', data: input }
     }
   }
 }

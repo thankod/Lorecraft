@@ -103,8 +103,18 @@ function createProvider(): ILLMProvider {
 // ============================================================
 
 async function main(): Promise<void> {
+  const debug = process.argv.includes('--debug')
+  const debugIdx = process.argv.indexOf('--debug')
+  const debugPath = debug && debugIdx + 1 < process.argv.length && !process.argv[debugIdx + 1].startsWith('-')
+    ? process.argv[debugIdx + 1]
+    : debug ? './debug.log' : undefined
+
+  if (debug) {
+    console.log(`[DEBUG] 调试模式已开启，日志将写入: ${debugPath}`)
+  }
+
   const provider = createProvider()
-  const app = new TUIApp(provider)
+  const app = new TUIApp(provider, debug ? { debug: debugPath } : undefined)
   await app.start()
 }
 

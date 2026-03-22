@@ -7,7 +7,7 @@ import type {
 } from '../../domain/models/pipeline-io.js'
 import type { Event } from '../../domain/models/event.js'
 import type { SignalProcessor } from '../../domain/services/signal-processor.js'
-import { EventGeneratorOutputSchema, SignalBOutputSchema } from '../../domain/models/pipeline-io.js'
+import { EventGeneratorOutputSchema, SignalBOutputSchema, PacingCheckOutputSchema } from '../../domain/models/pipeline-io.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
 
 // ============================================================
@@ -53,6 +53,69 @@ export class EventContextStep implements IPipelineStep<ArbitrationResult, Arbitr
 }
 
 // ============================================================
+// Step 1b: PacingCheckStep — determine narrative length guidance
+// ============================================================
+
+export class PacingCheckStep implements IPipelineStep<ArbitrationResult, ArbitrationResult> {
+  readonly name = 'PacingCheckStep'
+  private readonly agentRunner: AgentRunner
+  private readonly parser = new ResponseParser(PacingCheckOutputSchema)
+
+  constructor(agentRunner: AgentRunner) {
+    this.agentRunner = agentRunner
+  }
+
+  async execute(
+    input: ArbitrationResult,
+    context: PipelineContext,
+  ): Promise<StepResult<ArbitrationResult>> {
+    const systemPrompt = [
+      'You are a narrative pacing judge for a CRPG engine.',
+      'Given an action and recent context, decide if this moment calls for QUICK interaction or NARRATIVE expansion.',
+      '',
+      'QUICK: routine actions, simple dialogue, movement, repeated actions, checking inventory, etc. Max 100 characters.',
+      'NARRATIVE: dramatic moments, first encounters, combat, discoveries, emotional scenes, plot-advancing events. No character limit.',
+      '',
+      'Respond with ONLY valid JSON:',
+      '{ "pacing": "QUICK"|"NARRATIVE", "max_chars": number|null, "reasoning": string }',
+      'For QUICK, set max_chars to 100. For NARRATIVE, set max_chars to null.',
+    ].join('\n')
+
+    const recentNarrative = context.data.get('recent_context') as {
+      recent_narrative?: string[]
+    } | undefined
+
+    const userMessage = JSON.stringify({
+      action: input.action,
+      recent_narrative: recentNarrative?.recent_narrative?.slice(-3) ?? [],
+    })
+
+    try {
+      const response = await this.agentRunner.run(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage },
+        ],
+        { agent_type: 'PacingJudge' },
+      )
+
+      const result = this.parser.parse(response.content)
+      if (result.success) {
+        context.data.set('pacing', result.data)
+      } else {
+        // Default to narrative if parse fails
+        context.data.set('pacing', { pacing: 'NARRATIVE', max_chars: null, reasoning: 'parse_fallback' })
+      }
+    } catch {
+      // Non-critical; default to narrative
+      context.data.set('pacing', { pacing: 'NARRATIVE', max_chars: null, reasoning: 'error_fallback' })
+    }
+
+    return { status: 'continue', data: input }
+  }
+}
+
+// ============================================================
 // Step 2: EventGeneratorStep — LLM call to generate event
 // ============================================================
 
@@ -85,10 +148,20 @@ export class EventGeneratorStep
         'The player explicitly ignored warnings and forced this action. Generate significant negative consequences: relationship damage, closed opportunities, tangible world reactions.'
     }
 
+    // Pacing guidance from PacingCheckStep
+    const pacing = context.data.get('pacing') as { pacing: string; max_chars: number | null } | undefined
+    let pacingInstruction = ''
+    if (pacing?.pacing === 'QUICK') {
+      pacingInstruction = `PACING: This is a quick interaction. Keep narrative_text concise — no more than ${pacing.max_chars ?? 100} characters. Be brief and snappy.`
+    } else {
+      pacingInstruction = 'PACING: This is a narrative moment. Write vivid, immersive narrative_text at whatever length serves the story.'
+    }
+
     const systemPrompt = [
       'You are the EventGenerator agent for a CRPG engine.',
       'Generate a complete event from the given action and context.',
       forceInstruction,
+      pacingInstruction,
       'Respond with ONLY valid JSON: { "title": string, "tags": string[], "weight": "PRIVATE"|"MINOR"|"SIGNIFICANT"|"MAJOR", "summary": string, "context": string, "narrative_text": string, "state_changes": [{ "target": string, "field": string, "change_description": string }] }',
     ]
       .filter(Boolean)
@@ -265,6 +338,87 @@ export class EventWriteStep implements IPipelineStep<EventPipelineData, EventPip
         },
       }
     }
+
+    return { status: 'continue', data: input }
+  }
+}
+
+// ============================================================
+// Step 5b: StateWritebackStep — update world state after event
+// ============================================================
+
+export class StateWritebackStep implements IPipelineStep<EventPipelineData, EventPipelineData> {
+  readonly name = 'StateWritebackStep'
+  private readonly stateStore: IStateStore
+  private readonly eventStore: IEventStore
+
+  constructor(stateStore: IStateStore, eventStore: IEventStore) {
+    this.stateStore = stateStore
+    this.eventStore = eventStore
+  }
+
+  async execute(
+    input: EventPipelineData,
+    context: PipelineContext,
+  ): Promise<StepResult<EventPipelineData>> {
+    const playerId = context.player_character_id
+    const gen = input.generator_output
+
+    // Update subjective memory: append this turn's narrative and state changes
+    const prevMemory = await this.stateStore.get<{
+      recent_narrative: string[]
+      known_facts: string[]
+      known_characters: string[]
+    }>(`memory:subjective:${playerId}`)
+
+    const recentNarrative = prevMemory?.recent_narrative ?? []
+    recentNarrative.push(gen.narrative_text)
+    // Keep last 20 narrative entries to avoid unbounded growth
+    if (recentNarrative.length > 20) {
+      recentNarrative.splice(0, recentNarrative.length - 20)
+    }
+
+    const knownFacts = prevMemory?.known_facts ?? []
+    for (const sc of gen.state_changes) {
+      knownFacts.push(`${sc.target}: ${sc.change_description}`)
+    }
+    // Keep last 50 facts
+    if (knownFacts.length > 50) {
+      knownFacts.splice(0, knownFacts.length - 50)
+    }
+
+    await this.stateStore.set(`memory:subjective:${playerId}`, {
+      recent_narrative: recentNarrative,
+      known_facts: knownFacts,
+      known_characters: prevMemory?.known_characters ?? [],
+    })
+
+    // Update objective world state: current scene
+    const prevObjective = await this.stateStore.get<{
+      current_location: string
+      scene_description: string
+      present_npcs: string[]
+    }>(`world:objective:${playerId}`)
+
+    await this.stateStore.set(`world:objective:${playerId}`, {
+      current_location: prevObjective?.current_location ?? '',
+      scene_description: gen.narrative_text,
+      present_npcs: prevObjective?.present_npcs ?? [],
+    })
+
+    // Update world summary with recent events
+    const allEvents = await this.eventStore.getAllTier1()
+    const recentTitles = allEvents.slice(-10).map((e) => e.title)
+    const prevSummary = await this.stateStore.get<string>(`world:summary:${playerId}`) ?? ''
+    // Rebuild summary: keep the world background (first line) + recent narrative
+    const summaryLines = prevSummary.split('\n')
+    const worldBg = summaryLines[0] ?? ''
+
+    await this.stateStore.set(`world:summary:${playerId}`, [
+      worldBg,
+      `最近发生的事：${recentTitles.join('、')}`,
+      `当前场景：${gen.narrative_text}`,
+    ].join('\n'))
 
     return { status: 'continue', data: input }
   }

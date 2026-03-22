@@ -29,14 +29,17 @@ import {
 } from '../orchestration/steps/reflection-steps.js'
 import {
   ParallelQueryStep,
+  FeasibilityCheckStep,
   ArbitrationResultStep,
 } from '../orchestration/steps/arbitration-steps.js'
 import {
   EventContextStep,
+  PacingCheckStep,
   EventGeneratorStep,
   EventSchemaValidationStep,
   EventIdStep,
   EventWriteStep,
+  StateWritebackStep,
   EventBroadcastStep,
 } from '../orchestration/steps/event-steps.js'
 import type { GenesisDocument } from '../domain/models/genesis.js'
@@ -92,7 +95,7 @@ export class GameLoop {
   private gameState: GameState | null = null
   private listener: GameEventListener | null = null
 
-  constructor(provider: ILLMProvider) {
+  constructor(provider: ILLMProvider, options?: { debug?: boolean | string }) {
     this.stateStore = new InMemoryStateStore()
     this.eventStore = new InMemoryEventStore()
     this.loreStore = new InMemoryLoreStore()
@@ -103,6 +106,8 @@ export class GameLoop {
       timeout_ms: 120_000,
       max_retries: 2,
       base_delay_ms: 2000,
+      language: '中文',
+      debug: options?.debug,
     })
     this.signalProcessor = new SignalProcessor(this.stateStore, [])
     this.locationGraph = new LocationGraph([])
@@ -133,6 +138,7 @@ export class GameLoop {
   }
 
   async initialize(): Promise<void> {
+    this.agentRunner.markTurn(0, '[INITIALIZATION]')
     this.listener?.onInitProgress('正在生成游戏世界…')
 
     const initAgent = new InitializationAgent({
@@ -183,6 +189,8 @@ export class GameLoop {
       return
     }
 
+    this.agentRunner.markTurn(this.gameState.currentTurn, playerInput)
+
     const context = createPipelineContext(
       this.gameState.sessionId,
       this.gameState.playerCharacterId,
@@ -190,12 +198,25 @@ export class GameLoop {
     )
 
     try {
+      // Pre-load context for pipeline steps
+      const subjectiveMemory = await this.stateStore.get<unknown>(
+        `memory:subjective:${this.gameState.playerCharacterId}`,
+      )
+      if (subjectiveMemory) {
+        context.data.set('recent_context', subjectiveMemory)
+      }
+
       // Build and run the full pipeline
       const pipeline = this.buildMainPipeline()
       const result = await pipeline.execute(playerInput, context)
 
       if (result) {
         this.listener?.onNarrative(result.text, result.source)
+
+        // If this was a rejection (short-circuit), write back to state for context continuity
+        if (result.source === 'rejection') {
+          await this.writeRejectionToState(result.text)
+        }
       }
 
       // Check for voice lines in context
@@ -240,6 +261,31 @@ export class GameLoop {
     return this.gameState
   }
 
+  // ---- Rejection State Writeback ----
+
+  private async writeRejectionToState(rejectionText: string): Promise<void> {
+    if (!this.gameState) return
+    const playerId = this.gameState.playerCharacterId
+
+    const prevMemory = await this.stateStore.get<{
+      recent_narrative: string[]
+      known_facts: string[]
+      known_characters: string[]
+    }>(`memory:subjective:${playerId}`)
+
+    const recentNarrative = prevMemory?.recent_narrative ?? []
+    recentNarrative.push(rejectionText)
+    if (recentNarrative.length > 20) {
+      recentNarrative.splice(0, recentNarrative.length - 20)
+    }
+
+    await this.stateStore.set(`memory:subjective:${playerId}`, {
+      recent_narrative: recentNarrative,
+      known_facts: prevMemory?.known_facts ?? [],
+      known_characters: prevMemory?.known_characters ?? [],
+    })
+  }
+
   // ---- Pipeline Construction ----
 
   private buildMainPipeline(): MainPipeline {
@@ -254,20 +300,23 @@ export class GameLoop {
     // Reflection stage (simplified)
     pipeline.addStep(new ActiveTraitStep(this.signalProcessor))
 
-    // Arbitration stage (simplified — query + result)
-    pipeline.addStep(new ParallelQueryStep(this.stateStore), (prevOutput) => {
-      // Extract first atomic action from the parsed intent
+    // Arbitration stage — single LLM feasibility check
+    pipeline.addStep(new ParallelQueryStep(this.stateStore, this.loreStore, this.eventStore), (prevOutput) => {
+      // Extract the single compound action from parsed intent
       const actions = prevOutput?.atomic_actions ?? [prevOutput]
       return Array.isArray(actions) ? actions[0] : actions
     })
+    pipeline.addStep(new FeasibilityCheckStep(this.agentRunner))
     pipeline.addStep(new ArbitrationResultStep())
 
     // Event stage
     pipeline.addStep(new EventContextStep(this.stateStore))
+    pipeline.addStep(new PacingCheckStep(this.agentRunner))
     pipeline.addStep(new EventGeneratorStep(this.agentRunner))
     pipeline.addStep(new EventSchemaValidationStep())
     pipeline.addStep(new EventIdStep())
     pipeline.addStep(new EventWriteStep(this.eventStore))
+    pipeline.addStep(new StateWritebackStep(this.stateStore, this.eventStore))
     pipeline.addStep(new EventBroadcastStep())
 
     return pipeline

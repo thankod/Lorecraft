@@ -38,8 +38,8 @@ export class TUIApp implements GameEventListener {
   private voiceLines: string[] = []
   private isProcessing = false
 
-  constructor(provider: ILLMProvider) {
-    this.gameLoop = new GameLoop(provider)
+  constructor(provider: ILLMProvider, options?: { debug?: boolean | string }) {
+    this.gameLoop = new GameLoop(provider, options)
     this.gameLoop.setListener(this)
 
     // Create screen
@@ -131,7 +131,7 @@ export class TUIApp implements GameEventListener {
         border: { fg: COLORS.border },
         label: { fg: COLORS.highlight, bold: true },
       },
-      inputOnFocus: true,
+      inputOnFocus: false,
       keys: true,
       mouse: true,
       padding: { left: 1 },
@@ -183,7 +183,7 @@ export class TUIApp implements GameEventListener {
 
     // Focus input on click
     this.narrativeBox.on('click', () => {
-      this.inputBox.focus()
+      this.focusInput()
     })
 
     this.screen.render()
@@ -302,8 +302,8 @@ export class TUIApp implements GameEventListener {
 
   private focusInput(): void {
     this.inputBox.clearValue()
-    this.inputBox.focus()
     this.screen.render()
+    this.inputBox.readInput()
   }
 
   private getSourcePrefix(source: string): string {

@@ -2,10 +2,10 @@
 
 ## 设计原则
 
-- 五层检查顺序固定，前层失败则不执行后层（提前短路）
-- Layer 2（物理可行性）是纯代码检查，不调用 LLM
-- Layer 1/3/4/5 需要 LLM 语义判断，各自有独立的 ContextAssembler
-- Layer 1/2/3 的数据查询可并发，合并结果后进行判断
+- 五维评估合并为**单次 LLM 调用**，减少延迟和 token 消耗
+- 所有上下文（主观记忆、客观状态、Lore、近期事件）在调用前并发查询
+- LLM 自由判断各维度是否通过，不通过时直接生成叙事内拒绝文本
+- 无硬编码枚举——动作类型、拒绝策略均由 LLM 语义判断
 
 ---
 
@@ -15,82 +15,77 @@
 输入：AtomicAction（单个原子动作）+ PipelineContext
 
 // 并发查询阶段（代码）
-Parallel:
-  Query A: 角色主观记忆近期缓冲 + RAG 召回   → 用于 Layer 1/3
-  Query B: 世界客观状态（地点/时间/可进入性）  → 用于 Layer 2
+ParallelQueryStep:
+  Promise.all([
+    主观记忆（memory:subjective:{characterId}）    → 用于信息/社交维度
+    客观世界状态（world:objective:{characterId}）   → 用于物理/空间维度
+    Lore 相关条目（按 action.target 查询）          → 用于叙事维度
+    近期事件历史（最近 10 条 Tier1 标题）            → 用于叙事/漂移维度
+  ])
 
-Wait for Parallel Queries
+// 单次 LLM 评估
+FeasibilityCheckStep:
+  将动作 + 所有上下文传给 LLM，要求评估五个维度：
+    1. 信息完整性
+    2. 空间/状态可行性
+    3. 社会/关系可行性
+    4. 叙事可行性
+    5. 叙事漂移（仅标记，不拒绝）
 
-Layer 1: 信息完整性检查（LLM）
-  输入：原子动作 + Query A 结果（主观记忆）
-  LLM 判断：角色主观上是否拥有执行此动作所需的信息？
-  ├─ passed: false → 生成叙事拒绝文本 → 短路返回
-  └─ passed: true → 继续
+  LLM 返回综合报告：
+    ├─ passed: false → 报告中包含 rejection_narrative → 短路返回
+    └─ passed: true → 继续
+        drift_flag 写入 context，由异步叙事轨道 Agent 处理
 
-Layer 2: 空间/状态可行性检查（纯代码）
-  输入：原子动作 + Query B 结果（客观状态）
-  代码检查：目标地点是否存在、是否可达、目标对象是否在场
-  ├─ failed → 生成叙事拒绝文本（LLM 生成文本，代码决定策略）→ 短路返回
-  └─ passed → 继续
+// 汇总结果
+ArbitrationResultStep:
+  组装 ArbitrationResult { passed, action, force_flag, force_level, drift_flag }
+  传递给事件 Pipeline
 
-Layer 3: 社会/关系可行性检查（LLM）
-  输入：原子动作 + Query A 结果（关系图谱部分）
-  LLM 判断：当前关系状态是否允许此交互？场合是否合适？
-  ├─ passed: false → 生成叙事拒绝文本 → 短路返回
-  └─ passed: true → 继续
-
-// Layer 4 需要额外查询
-Query C: Lore 相关条目 + 近期事件历史（LoreStore + EventStore）
-
-Layer 4: 叙事可行性检查（LLM）
-  输入：原子动作 + Query C 结果
-  LLM 判断：叙事前置条件是否满足？动作是否产生逻辑悖论？
-  ├─ passed: false → 生成叙事拒绝文本 → 短路返回
-  └─ passed: true → 继续
-
-Layer 5: 叙事轨道检查（LLM）
-  输入：原子动作 + 叙事结构摘要 + 近期事件方向
-  LLM 判断：此动作是否会导致叙事严重偏轨？
-  ├─ drift_detected: true → 不短路，仍然通过仲裁
-  │   结果附加 drift_flag=true，通知叙事轨道 Agent
-  │   叙事轨道 Agent 在异步周期内自主决定干预方式
-  │   （通过注入队列间接影响，不在主链中阻断玩家行为）
-  └─ drift_detected: false → 继续
-
-输出：ArbitrationResult { passed: true, action, force_flag, force_level, drift_flag }
+输出：ArbitrationResult
 ```
 
 ---
 
-## 拒绝策略路由（代码逻辑）
+## LLM 输入/输出
 
-```
-失败层 → 默认拒绝策略映射（代码路由，不由 LLM 决定策略类型）：
+### 输入
 
-Layer 1（信息不足）   → NARRATIVE_ABSORB（叙事内消化，提示角色不知道）
-Layer 2（物理不可行） → PARTIAL_EXEC（部分执行+自然中断）或 NARRATIVE_ABSORB
-Layer 3（社会不可行） → NARRATIVE_ABSORB（通过 NPC 反应或环境体现阻力）
-Layer 4（叙事前置缺失）→ REINTERPRET（重新解读意图，说明缺少条件）
-Layer 5（轨道偏离）   → 不直接拒绝，不短路 Pipeline
-
-CONSEQUENCE（代价式执行）：仅在 force_flag=true 时由事件 Agent 使用，
-  不是仲裁层的拒绝策略，而是事件生成时的后果加权模式。
-  仲裁层输出中不使用此值。
+```json
+{
+  "action": { "type": "MOVE_TO", "target": "mayor_office", "method": null, "order": 0 },
+  "subjective_memory": { ... },
+  "objective_world_state": { ... },
+  "lore_context": [ ... ],
+  "recent_events": ["事件标题1", "事件标题2"]
+}
 ```
 
-确定拒绝策略类型后，调用 `RejectionNarrativeGenerator` 生成具体叙事文本。
+### 输出
+
+```json
+{
+  "passed": boolean,
+  "checks": [
+    { "dimension": string, "passed": boolean, "reason": string | null }
+  ],
+  "drift_flag": boolean,
+  "rejection_narrative": string | null
+}
+```
+
+- `checks` 数组包含五个维度的逐项评估
+- `rejection_narrative` 仅在 `passed: false` 时有值，是面向玩家的叙事文本
+- `drift_flag` 独立于 passed/failed，第五维永远不阻断动作
 
 ---
 
-## 并发查询实现
+## 与旧设计的对比
 
-Layer 1/2/3 的查询（Query A 和 Query B）可以并发执行：
-
-```
-results = await Promise.all([
-  memoryStore.querySubjective(character_id, action_context),
-  worldState.queryObjective(action.target_location)
-])
-```
-
-Query C（Layer 4 使用）在 Layer 3 通过后才发起，不提前并发（避免浪费）。
+| 方面 | 旧设计 | 新设计 |
+|------|--------|--------|
+| LLM 调用次数 | 4-5 次（Layer 1/3/4/5 各一次 + 拒绝叙事） | 1 次 |
+| 物理检查 | 硬编码（LocationGraph + NPC 在场） | LLM 基于世界状态语义判断 |
+| 拒绝策略 | 枚举路由（NARRATIVE_ABSORB / PARTIAL_EXEC / REINTERPRET） | LLM 自由选择 |
+| 动作类型 | 7 种枚举，未知类型报错 | 开放字符串，LLM 可使用任意动词 |
+| 延迟 | 串行多次调用 | 并发查询 + 单次评估 |

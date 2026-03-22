@@ -593,6 +593,41 @@ CRITICAL RULES:
 
     await this.eventStore.append(event)
 
+    // Seed subjective memory and world state for the player character
+    const playerId = doc.characters.player_character.id
+    const startLoc = doc.initial_locations.find((l) => l.id === inciting.location_id)
+    const locationDesc = startLoc ? `${startLoc.name}：${startLoc.description}` : ''
+
+    // Subjective memory: what the player character has experienced
+    await this.stateStore.set(`memory:subjective:${playerId}`, {
+      recent_narrative: [inciting.narrative_text],
+      known_facts: [
+        doc.characters.player_character.background,
+        `当前位置：${locationDesc}`,
+      ],
+      known_characters: inciting.participant_ids,
+    })
+
+    // Objective world state: what exists in the current scene
+    await this.stateStore.set(`world:objective:${playerId}`, {
+      current_location: locationDesc,
+      scene_description: inciting.narrative_text,
+      present_npcs: inciting.participant_ids,
+    })
+
+    // World summary for EventContextStep
+    await this.stateStore.set(`world:summary:${playerId}`, [
+      doc.world_setting.background,
+      `当前位置：${locationDesc}`,
+      `当前场景：${inciting.narrative_text}`,
+    ].join('\n'))
+
+    // Participant states for EventContextStep
+    const participantStates = doc.characters.tier_a_npcs
+      .filter((n) => inciting.participant_ids.includes(n.id))
+      .map((n) => ({ npc_id: n.id, state_summary: `${n.name}：${n.background}` }))
+    await this.stateStore.set(`participants:states:${playerId}`, participantStates)
+
     if (this.eventBus) {
       await this.eventBus.publish({
         id: event.id,
