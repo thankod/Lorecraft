@@ -150,7 +150,7 @@ async function main(): Promise<void> {
 
   // --server [port]  → start WebSocket server
   if (hasFlag('--server')) {
-    const port = parseInt(getArgValue('--server') ?? process.env.PORT ?? '3000', 10)
+    const port = parseInt(getArgValue('--server') ?? process.env.PORT ?? '3015', 10)
     const { GameServer } = await import('./server/game-server.js')
     const provider = createProvider()
     const server = new GameServer({ port, provider, debug: debugPath })

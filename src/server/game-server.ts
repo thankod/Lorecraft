@@ -113,6 +113,8 @@ class GameSession implements GameEventListener {
 // GameServer — WebSocket server managing sessions
 // ============================================================
 
+export const DEFAULT_PORT = 3015
+
 export interface GameServerOptions {
   port: number
   provider: ILLMProvider
