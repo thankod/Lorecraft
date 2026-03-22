@@ -1,0 +1,11 @@
+[IDENTITY]
+{{identity}}
+
+[WORLD_CONTEXT]
+{{world_context}}
+
+[RUNTIME_CONTEXT]
+{{runtime_context}}
+
+[TASK_INSTRUCTION]
+{{task_instruction}}
