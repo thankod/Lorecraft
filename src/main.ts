@@ -9,7 +9,6 @@ import type { ILLMProvider } from './ai/runner/llm-provider.js'
 import { AnthropicProvider } from './ai/runner/anthropic-provider.js'
 import { GeminiProvider } from './ai/runner/gemini-provider.js'
 import { OpenAIProvider } from './ai/runner/openai-provider.js'
-import { TUIApp } from './interface/tui.js'
 
 // ============================================================
 // Config Loading: ~/.config/lorecraft/.env → project .env → env vars
@@ -127,21 +126,56 @@ function createProvider(): ILLMProvider {
 }
 
 // ============================================================
+// CLI Argument Parsing
+// ============================================================
+
+function getArgValue(flag: string): string | undefined {
+  const idx = process.argv.indexOf(flag)
+  if (idx === -1) return undefined
+  const next = process.argv[idx + 1]
+  return next && !next.startsWith('-') ? next : undefined
+}
+
+function hasFlag(flag: string): boolean {
+  return process.argv.includes(flag)
+}
+
+// ============================================================
 // Main
 // ============================================================
 
 async function main(): Promise<void> {
-  const debug = process.argv.includes('--debug')
-  const debugIdx = process.argv.indexOf('--debug')
-  const debugPath = debug && debugIdx + 1 < process.argv.length && !process.argv[debugIdx + 1].startsWith('-')
-    ? process.argv[debugIdx + 1]
-    : debug ? './debug.log' : undefined
+  const debug = hasFlag('--debug')
+  const debugPath = debug ? (getArgValue('--debug') ?? './debug.log') : undefined
 
+  // --server [port]  → start WebSocket server
+  if (hasFlag('--server')) {
+    const port = parseInt(getArgValue('--server') ?? process.env.PORT ?? '3000', 10)
+    const { GameServer } = await import('./server/game-server.js')
+    const provider = createProvider()
+    const server = new GameServer({ port, provider, debug: debugPath })
+    await server.start()
+    console.log(`Lorecraft server listening on ws://localhost:${port}`)
+    if (debug) console.log(`[DEBUG] 调试日志: ${debugPath}`)
+    return
+  }
+
+  // --connect <url>  → TUI client connecting to server
+  if (hasFlag('--connect')) {
+    const url = getArgValue('--connect') ?? 'ws://localhost:3000'
+    const { TUIClient } = await import('./interface/tui-client.js')
+    const client = new TUIClient(url)
+    await client.start()
+    return
+  }
+
+  // Default: monolithic TUI (backward compatible)
   if (debug) {
     console.log(`[DEBUG] 调试模式已开启，日志将写入: ${debugPath}`)
   }
 
   const provider = createProvider()
+  const { TUIApp } = await import('./interface/tui.js')
   const app = new TUIApp(provider, debug ? { debug: debugPath } : undefined)
   await app.start()
 }

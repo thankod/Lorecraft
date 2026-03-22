@@ -8,6 +8,8 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "dev": "tsx src/main.ts",
+    "server": "tsx src/main.ts --server",
+    "client": "tsx src/main.ts --connect ws://localhost:3000",
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -28,6 +30,7 @@
   "devDependencies": {
     "@types/blessed": "^0.1.27",
     "@types/node": "^25.5.0",
+    "@types/ws": "^8.18.1",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
@@ -40,6 +43,7 @@
     "dotenv": "^17.3.1",
     "openai": "^4.103.0",
     "undici": "^7.24.5",
+    "ws": "^8.20.0",
     "zod": "^4.3.6"
   }
 }

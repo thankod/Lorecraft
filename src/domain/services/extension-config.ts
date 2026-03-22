@@ -40,6 +40,57 @@ export const DEFAULT_COGNITIVE_VOICES: CognitiveVoiceConfig[] = [
 ]
 
 // ============================================================
+// Default Trait Configs (personality inner voices)
+// ============================================================
+
+export const DEFAULT_TRAIT_CONFIGS: TraitConfig[] = [
+  {
+    trait_id: 'logic',
+    trait_type: 'VALUE',
+    display_name: '逻辑',
+    voice_description: '冷静分析，善于发现矛盾和漏洞，追求理性判断',
+    threshold_active: 0.4,
+    threshold_silent: 0.1,
+    hysteresis_band: 0.05,
+    decay_rate: 0.95,
+    signal_mapping: { analytical: 1.0, cautious: 0.5, aggressive: -0.3 },
+  },
+  {
+    trait_id: 'empathy',
+    trait_type: 'VALUE',
+    display_name: '同理心',
+    voice_description: '感受他人的情绪和处境，关注行为对他人的影响',
+    threshold_active: 0.4,
+    threshold_silent: 0.1,
+    hysteresis_band: 0.05,
+    decay_rate: 0.95,
+    signal_mapping: { compassionate: 1.0, diplomatic: 0.5, aggressive: -0.5 },
+  },
+  {
+    trait_id: 'instinct',
+    trait_type: 'EXPRESSION',
+    display_name: '直觉',
+    voice_description: '凭直觉判断，警觉危险信号，预感事态发展',
+    threshold_active: 0.4,
+    threshold_silent: 0.1,
+    hysteresis_band: 0.05,
+    decay_rate: 0.9,
+    signal_mapping: { cautious: 0.8, aggressive: 0.3, analytical: -0.2 },
+  },
+  {
+    trait_id: 'authority',
+    trait_type: 'VALUE',
+    display_name: '权威',
+    voice_description: '引用规则、制度和权力结构，强调秩序与责任',
+    threshold_active: 0.4,
+    threshold_silent: 0.1,
+    hysteresis_band: 0.05,
+    decay_rate: 0.95,
+    signal_mapping: { authoritative: 1.0, diplomatic: 0.3, rebellious: -0.5 },
+  },
+]
+
+// ============================================================
 // Default Tier C Templates
 // ============================================================
 
@@ -83,7 +134,7 @@ export class ExtensionConfigLoader {
     this.styleConfig = { ...DEFAULT_STYLE_CONFIG, ...overrides?.style }
     this.cognitiveVoices = overrides?.voices ?? [...DEFAULT_COGNITIVE_VOICES]
     this.tierCTemplates = overrides?.templates ?? [...DEFAULT_TIER_C_TEMPLATES]
-    this.traitConfigs = overrides?.traits ?? []
+    this.traitConfigs = overrides?.traits ?? [...DEFAULT_TRAIT_CONFIGS]
   }
 
   getStyleConfig(): StyleConfig {

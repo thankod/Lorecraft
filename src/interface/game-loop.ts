@@ -109,13 +109,13 @@ export class GameLoop {
       language: '中文',
       debug: options?.debug,
     })
-    this.signalProcessor = new SignalProcessor(this.stateStore, [])
+    this.configLoader = new ExtensionConfigLoader()
+    this.signalProcessor = new SignalProcessor(this.stateStore, this.configLoader.getTraitConfigs())
     this.locationGraph = new LocationGraph([])
     this.insistenceSM = new InsistenceStateMachine()
     this.deadLetterQueue = new DeadLetterQueue()
     this.eventBus = new EventBus(this.deadLetterQueue)
     this.broadcastRouter = new BroadcastRouter(this.stateStore)
-    this.configLoader = new ExtensionConfigLoader()
 
     const intentGenerator = new NPCIntentGenerator(this.agentRunner, this.stateStore)
     const tierManager = new NPCTierManager(this.stateStore)
@@ -158,6 +158,16 @@ export class GameLoop {
       const edges = await this.stateStore.get<LocationEdge[]>('world:location_edges')
       if (edges) {
         this.locationGraph = new LocationGraph(edges)
+      }
+
+      // Seed initial trait weights so the reflection system starts active
+      for (const traitConfig of this.configLoader.getTraitConfigs()) {
+        await this.stateStore.set(`player:traits:${traitConfig.trait_id}`, {
+          trait_id: traitConfig.trait_id,
+          trait_type: traitConfig.trait_type,
+          current_weight: traitConfig.threshold_active + 0.1,
+          last_updated_turn: 0,
+        })
       }
 
       const sessionId = crypto.randomUUID()
