@@ -1,10 +1,33 @@
 #!/usr/bin/env node
 
-import 'dotenv/config'
+import { config } from 'dotenv'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { homedir } from 'node:os'
 import type { ILLMProvider } from './ai/runner/llm-provider.js'
 import { AnthropicProvider } from './ai/runner/anthropic-provider.js'
 import { GeminiProvider } from './ai/runner/gemini-provider.js'
 import { TUIApp } from './interface/tui.js'
+
+// ============================================================
+// Config Loading: ~/.config/lorecraft/.env → project .env → env vars
+// ============================================================
+
+function loadConfig(): void {
+  // Priority 1: XDG_CONFIG_HOME or ~/.config/lorecraft/.env
+  const xdgConfig = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config')
+  const globalEnv = join(xdgConfig, 'lorecraft', '.env')
+
+  if (existsSync(globalEnv)) {
+    config({ path: globalEnv })
+    return
+  }
+
+  // Priority 2: project root .env (fallback)
+  config()
+}
+
+loadConfig()
 
 // ============================================================
 // Provider Selection
@@ -41,11 +64,17 @@ function createProvider(): ILLMProvider {
     })
   }
 
-  console.error('No API key found. Set one of:')
-  console.error('  GEMINI_API_KEY or GOOGLE_API_KEY  (for Google Gemini)')
-  console.error('  ANTHROPIC_API_KEY                 (for Anthropic Claude)')
+  console.error('No API key found.')
   console.error('')
-  console.error('Optionally set LLM_PROVIDER=gemini|anthropic to force a provider.')
+  console.error('Create config at ~/.config/lorecraft/.env :')
+  console.error('')
+  console.error('  mkdir -p ~/.config/lorecraft')
+  console.error('  cp .env.example ~/.config/lorecraft/.env')
+  console.error('  # Then edit ~/.config/lorecraft/.env and fill in your API key')
+  console.error('')
+  console.error('Supported keys:')
+  console.error('  GEMINI_API_KEY    (Google Gemini)')
+  console.error('  ANTHROPIC_API_KEY (Anthropic Claude)')
   process.exit(1)
 }
 
