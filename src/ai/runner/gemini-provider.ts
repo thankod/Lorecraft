@@ -13,7 +13,7 @@ export class GeminiProvider implements ILLMProvider {
       )
     }
     this.client = new GoogleGenerativeAI(key)
-    this.model = model ?? 'gemini-2.5-flash'
+    this.model = model ?? process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
   }
 
   async call(

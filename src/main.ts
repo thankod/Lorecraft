@@ -4,6 +4,7 @@ import { config } from 'dotenv'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+import { setGlobalDispatcher, ProxyAgent } from 'undici'
 import type { ILLMProvider } from './ai/runner/llm-provider.js'
 import { AnthropicProvider } from './ai/runner/anthropic-provider.js'
 import { GeminiProvider } from './ai/runner/gemini-provider.js'
@@ -28,6 +29,25 @@ function loadConfig(): void {
 }
 
 loadConfig()
+
+// ============================================================
+// Proxy Setup: make Node.js fetch respect http_proxy / https_proxy
+// ============================================================
+
+function setupProxy(): void {
+  const proxyUrl =
+    process.env.https_proxy ??
+    process.env.HTTPS_PROXY ??
+    process.env.http_proxy ??
+    process.env.HTTP_PROXY ??
+    process.env.ALL_PROXY
+
+  if (proxyUrl) {
+    setGlobalDispatcher(new ProxyAgent(proxyUrl))
+  }
+}
+
+setupProxy()
 
 // ============================================================
 // Provider Selection

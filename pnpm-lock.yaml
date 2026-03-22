@@ -20,6 +20,9 @@ importers:
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
+      undici:
+        specifier: ^7.24.5
+        version: 7.24.5
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -905,6 +908,10 @@ packages:
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
+  undici@7.24.5:
+    resolution: {integrity: sha512-3IWdCpjgxp15CbJnsi/Y9TCDE7HWVN19j1hmzVhoAkY/+CJx449tVxT5wZc1Gwg8J+P0LWvzlBzxYRnHJ+1i7Q==}
+    engines: {node: '>=20.18.1'}
+
   vite@8.0.1:
     resolution: {integrity: sha512-wt+Z2qIhfFt85uiyRt5LPU4oVEJBXj8hZNWKeqFG4gRG/0RaRGJ7njQCwzFVjO+v4+Ipmf5CY7VdmZRAYYBPHw==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1662,6 +1669,8 @@ snapshots:
   ufo@1.6.3: {}
 
   undici-types@7.18.2: {}
+
+  undici@7.24.5: {}
 
   vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(tsx@4.21.0):
     dependencies:

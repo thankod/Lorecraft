@@ -95,23 +95,99 @@ export class InitializationAgent {
   ): Promise<GenesisDocument> {
     let lastError = ''
 
+    const schemaHint = `
+STRICT JSON SCHEMA (follow EXACTLY):
+{
+  "world_setting": {
+    "background": "string - world background description",
+    "tone": "string - narrative tone",
+    "core_conflict": "string - central conflict",
+    "hidden_secrets": ["string array - secrets hidden from player"],
+    "factions": [{
+      "id": "string",
+      "name": "string",
+      "description": "string",
+      "initial_strength": "WEAK" | "MODERATE" | "STRONG" | "DOMINANT",
+      "initial_resources": "string",
+      "initial_relationships": {
+        "other_faction_id": {
+          "relation_type": "ALLIED" | "NEUTRAL" | "HOSTILE" | "UNKNOWN",
+          "description": "string"
+        }
+      }
+    }]
+  },
+  "narrative_structure": {
+    "final_goal_description": "string",
+    "inciting_event": {
+      "title": "string",
+      "description": "string",
+      "location_id": "string - must match a location id",
+      "participant_ids": ["string array - character ids involved"],
+      "narrative_text": "string - the opening narrative text"
+    },
+    "phases": [{
+      "phase_id": "string",
+      "description": "string",
+      "direction_summary": "string - REQUIRED"
+    }]
+  },
+  "characters": {
+    "player_character": { "id": "string", "name": "string", "background": "string" },
+    "tier_a_npcs": [{
+      "id": "string",
+      "name": "string",
+      "background": "string",
+      "surface_motivation": "string",
+      "deep_motivation": "string",
+      "secrets": ["string array"],
+      "initial_relationships": { "other_npc_id": "string description" }
+    }],
+    "tier_b_npcs": [{
+      "id": "string",
+      "name": "string",
+      "background": "string",
+      "role_description": "string"
+    }]
+  },
+  "initial_locations": [{
+    "id": "string",
+    "name": "string",
+    "region_id": "string",
+    "description": "string",
+    "initial_status": "string",
+    "connections": [{
+      "to_location_id": "string",
+      "traversal_condition": "OPEN" | "REQUIRES_KEY" | "REQUIRES_EVENT" | "BLOCKED",
+      "condition_detail": "string or null",
+      "travel_time_turns": number
+    }]
+  }]
+}
+
+CRITICAL RULES:
+- Do NOT include "id" or "created_at" at the top level (they will be auto-generated)
+- Enum values MUST be UPPERCASE: "WEAK"/"MODERATE"/"STRONG"/"DOMINANT", "ALLIED"/"NEUTRAL"/"HOSTILE"/"UNKNOWN", "OPEN"/"REQUIRES_KEY"/"REQUIRES_EVENT"/"BLOCKED"
+- tier_a_npcs: 3-7 NPCs, each must have initial_relationships referencing other NPC ids
+- If NPC A references NPC B, NPC B MUST reference NPC A back
+- phases: at least 3, each MUST have direction_summary
+- initial_locations: at least 3, with connections between them
+- inciting_event.location_id must be one of the location ids
+- All content in Chinese (中文)
+`
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const systemPrompt = [
-        'You are the WorldGenerator for a CRPG engine.',
+        'You are the WorldGenerator for a CRPG engine (对话式角色扮演游戏).',
         `Game Style: ${styleConfig.tone}`,
         `Complexity: ${styleConfig.complexity}`,
         `Narrative Style: ${styleConfig.narrative_style}`,
         `Player Archetype: ${styleConfig.player_archetype}`,
         '',
-        'Generate a complete GenesisDocument for a new game world.',
-        'Include: world_setting (with 2-4 factions), narrative_structure (with 3+ phases and an inciting_event),',
-        'characters (1 player_character, 3-7 tier_a_npcs, 2+ tier_b_npcs), and initial_locations (3+ locations with connections).',
+        schemaHint,
+        lastError ? `\n上一次尝试失败原因: ${lastError}\n请修正这些问题。` : '',
         '',
-        'NPC relationship consistency: if NPC A references NPC B, B must reference A.',
-        'Each narrative phase must have a direction_summary.',
-        lastError ? `\nPrevious attempt failed: ${lastError}\nPlease fix these issues.` : '',
-        '',
-        'Respond with ONLY valid JSON matching the GenesisDocument schema.',
+        'Respond with ONLY valid JSON. No markdown, no explanation, just JSON.',
       ]
         .filter(Boolean)
         .join('\n')
@@ -120,14 +196,16 @@ export class InitializationAgent {
         const response = await this.agentRunner.run(
           [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: 'Generate a new game world.' },
+            { role: 'user', content: '生成一个新的游戏世界。只输出JSON。' },
           ],
           { agent_type: 'WorldGenerator' },
         )
 
-        const result = this.genesisParser.parse(response.content)
+        // Pre-process: inject metadata fields and normalize enums
+        const preprocessed = this.preprocessLLMOutput(response.content)
+
+        const result = this.genesisParser.parse(preprocessed)
         if (result.success) {
-          // Additional consistency checks
           const validationErrors = this.validateGenesisConsistency(result.data)
           if (validationErrors.length === 0) {
             return result.data
@@ -142,6 +220,75 @@ export class InitializationAgent {
     }
 
     throw new Error(`WorldGenerator failed after ${maxRetries} attempts: ${lastError}`)
+  }
+
+  /**
+   * Pre-process LLM output:
+   * - Inject id/created_at if missing
+   * - Normalize enum values to uppercase
+   */
+  private preprocessLLMOutput(raw: string): string {
+    // Extract JSON first
+    const codeBlockMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/)
+    let jsonStr = codeBlockMatch ? codeBlockMatch[1].trim() : raw
+
+    const jsonMatch = jsonStr.match(/(\{[\s\S]*\})/)
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1]
+    }
+
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(jsonStr)
+    } catch {
+      return raw // Let the parser handle the error
+    }
+
+    // Inject top-level metadata if missing
+    if (!parsed.id) {
+      parsed.id = crypto.randomUUID()
+    }
+    if (!parsed.created_at) {
+      parsed.created_at = Date.now()
+    }
+
+    // Normalize enum values throughout the object
+    const normalized = this.normalizeEnums(parsed)
+
+    return JSON.stringify(normalized)
+  }
+
+  private normalizeEnums(obj: unknown): unknown {
+    if (obj === null || obj === undefined) return obj
+    if (typeof obj === 'string') {
+      // Known enum values → uppercase
+      const ENUM_MAP: Record<string, string> = {
+        weak: 'WEAK', moderate: 'MODERATE', strong: 'STRONG', dominant: 'DOMINANT',
+        allied: 'ALLIED', neutral: 'NEUTRAL', hostile: 'HOSTILE', unknown: 'UNKNOWN',
+        open: 'OPEN', requires_key: 'REQUIRES_KEY', requires_event: 'REQUIRES_EVENT', blocked: 'BLOCKED',
+      }
+      return ENUM_MAP[obj.toLowerCase()] ?? obj
+    }
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.normalizeEnums(item))
+    }
+    if (typeof obj === 'object') {
+      const result: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+        // Only normalize values for known enum fields
+        if (
+          key === 'initial_strength' ||
+          key === 'relation_type' ||
+          key === 'traversal_condition'
+        ) {
+          result[key] = typeof value === 'string' ? this.normalizeEnums(value) : value
+        } else {
+          result[key] = this.normalizeEnums(value)
+        }
+      }
+      return result
+    }
+    return obj
   }
 
   private validateGenesisConsistency(doc: GenesisDocument): string[] {
