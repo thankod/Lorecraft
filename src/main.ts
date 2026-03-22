@@ -8,6 +8,7 @@ import { setGlobalDispatcher, ProxyAgent } from 'undici'
 import type { ILLMProvider } from './ai/runner/llm-provider.js'
 import { AnthropicProvider } from './ai/runner/anthropic-provider.js'
 import { GeminiProvider } from './ai/runner/gemini-provider.js'
+import { OpenAIProvider } from './ai/runner/openai-provider.js'
 import { TUIApp } from './interface/tui.js'
 
 // ============================================================
@@ -72,6 +73,19 @@ function createProvider(): ILLMProvider {
     return new AnthropicProvider({ apiKey: key, model: process.env.ANTHROPIC_MODEL })
   }
 
+  if (providerName === 'openai' || providerName === 'openai-compatible') {
+    const key = process.env.OPENAI_API_KEY
+    if (!key) {
+      console.error('OPENAI_API_KEY is required when LLM_PROVIDER=openai')
+      process.exit(1)
+    }
+    return new OpenAIProvider({
+      apiKey: key,
+      model: process.env.OPENAI_MODEL,
+      baseURL: process.env.OPENAI_BASE_URL,
+    })
+  }
+
   // Auto-detect based on available API keys
   if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
     return new GeminiProvider()
@@ -84,6 +98,14 @@ function createProvider(): ILLMProvider {
     })
   }
 
+  if (process.env.OPENAI_API_KEY) {
+    return new OpenAIProvider({
+      apiKey: process.env.OPENAI_API_KEY,
+      model: process.env.OPENAI_MODEL,
+      baseURL: process.env.OPENAI_BASE_URL,
+    })
+  }
+
   console.error('No API key found.')
   console.error('')
   console.error('Create config at ~/.config/lorecraft/.env :')
@@ -93,8 +115,14 @@ function createProvider(): ILLMProvider {
   console.error('  # Then edit ~/.config/lorecraft/.env and fill in your API key')
   console.error('')
   console.error('Supported keys:')
-  console.error('  GEMINI_API_KEY    (Google Gemini)')
-  console.error('  ANTHROPIC_API_KEY (Anthropic Claude)')
+  console.error('  GEMINI_API_KEY       (Google Gemini)')
+  console.error('  ANTHROPIC_API_KEY    (Anthropic Claude)')
+  console.error('  OPENAI_API_KEY       (OpenAI or compatible APIs)')
+  console.error('')
+  console.error('For OpenAI-compatible APIs (e.g., local LLMs), set:')
+  console.error('  LLM_PROVIDER=openai')
+  console.error('  OPENAI_API_KEY=your-key')
+  console.error('  OPENAI_BASE_URL=http://localhost:11434/v1')
   process.exit(1)
 }
 
