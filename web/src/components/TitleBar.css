@@ -1,0 +1,28 @@
+.title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.title-logo {
+  color: var(--title);
+  font-weight: bold;
+  font-size: 14px;
+  letter-spacing: 2px;
+}
+
+.conn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status);
+}
+
+.conn-dot.connected { background: var(--system); }
+.conn-dot.connecting { background: var(--highlight); animation: pulse 1.5s infinite; }
+.conn-dot.disconnected { background: var(--error); }

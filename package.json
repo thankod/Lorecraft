@@ -11,6 +11,8 @@
     "server": "tsx src/main.ts --server",
     "client": "tsx src/main.ts --connect ws://localhost:3015",
     "web": "tsx src/main.ts --web",
+    "web:dev": "cd web && pnpm dev",
+    "web:build": "cd web && pnpm build",
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -1,0 +1,65 @@
+.bottom-bar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.status-bar {
+  display: flex;
+  gap: 12px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--status);
+  border-bottom: 1px solid var(--border);
+  min-height: 24px;
+}
+
+.status-processing {
+  color: var(--highlight);
+  animation: pulse 1.5s infinite;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.input-field {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--input-fg);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+}
+
+.input-field:focus {
+  border-color: var(--title);
+}
+
+.input-field:disabled {
+  opacity: 0.5;
+}
+
+.send-btn {
+  padding: 6px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--title);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: var(--border);
+}
+
+.send-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

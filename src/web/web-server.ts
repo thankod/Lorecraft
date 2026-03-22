@@ -4,7 +4,7 @@ import { join, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
-const PUBLIC_DIR = join(__dirname, 'public')
+const PUBLIC_DIR = join(__dirname, '..', '..', 'web', 'dist')
 
 export const DEFAULT_WEB_PORT = 3016
 

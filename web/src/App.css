@@ -1,0 +1,11 @@
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tab-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}

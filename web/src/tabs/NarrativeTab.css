@@ -1,0 +1,23 @@
+.narrative-tab {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px;
+}
+
+.narrative-line {
+  margin-bottom: 4px;
+  word-break: break-word;
+}
+
+.narrative-line.spacer { height: 8px; }
+.narrative-line.event { color: var(--narrative); }
+.narrative-line.player-input { color: var(--highlight); font-weight: bold; }
+.narrative-line.rejection { color: var(--status); }
+.narrative-line.inciting { color: var(--title); font-weight: bold; }
+.narrative-line.error { color: var(--error); font-weight: bold; }
+.narrative-line.system { color: var(--system); }
+.narrative-line.info { color: var(--status); }
+.narrative-line.world-bg { color: var(--status); }
+.narrative-line.world-title { color: var(--title); font-weight: bold; font-size: 17px; }
+.narrative-line.player-intro { color: var(--system); }
+.narrative-line.separator { color: var(--title); font-weight: bold; }
