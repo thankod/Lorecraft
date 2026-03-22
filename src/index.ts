@@ -79,6 +79,14 @@ export {
   NarrativeRailAgent,
   LoreCanonicalizer,
   PropagationScheduler,
+  // Phase 5
+  InitializationAgent,
+  SaveLoadSystem,
+  ExtensionConfigLoader,
+  AuthorTooling,
+  DEFAULT_STYLE_CONFIG,
+  DEFAULT_COGNITIVE_VOICES,
+  DEFAULT_TIER_C_TEMPLATES,
 } from './domain/services/index.js'
 
 export type {
@@ -97,4 +105,8 @@ export type {
   ExtractedFact,
   ConsistencyVerdict,
   PropagationEntry,
+  // Phase 5
+  StyleConfig,
+  CognitiveVoiceConfig,
+  IAuthorTooling,
 } from './domain/services/index.js'

@@ -34,3 +34,19 @@ export { LoreCanonicalizer } from './lore-canonicalizer.js'
 export type { ExtractedFact, ConsistencyVerdict } from './lore-canonicalizer.js'
 export { PropagationScheduler } from './propagation-scheduler.js'
 export type { PropagationEntry } from './propagation-scheduler.js'
+
+// Phase 5: Integration
+export { InitializationAgent } from './initialization-agent.js'
+export { SaveLoadSystem } from './save-load-system.js'
+export {
+  ExtensionConfigLoader,
+  AuthorTooling,
+  DEFAULT_STYLE_CONFIG,
+  DEFAULT_COGNITIVE_VOICES,
+  DEFAULT_TIER_C_TEMPLATES,
+} from './extension-config.js'
+export type {
+  StyleConfig,
+  CognitiveVoiceConfig,
+  IAuthorTooling,
+} from './extension-config.js'
