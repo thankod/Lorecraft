@@ -82,7 +82,22 @@ pnpm start -- --server 8080
 pnpm start -- --connect ws://192.168.1.100:8080
 ```
 
-CS 模式对接的是标准 WebSocket JSON 协议，任何 WebSocket 客户端（包括浏览器）都可以连接。
+### Web 模式
+
+一条命令同时启动 WebSocket 服务器（3015）和 Web 前端（3016）：
+
+```bash
+pnpm web
+```
+
+然后浏览器打开 `http://localhost:3016` 即可游玩。
+
+也可以分别指定端口：
+
+```bash
+pnpm start -- --server 3015 --web 3016
+pnpm start -- --web 8080  # WS 用默认 3015，Web 用 8080
+```
 
 ### 调试模式
 

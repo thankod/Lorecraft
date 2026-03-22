@@ -10,6 +10,7 @@
     "dev": "tsx src/main.ts",
     "server": "tsx src/main.ts --server",
     "client": "tsx src/main.ts --connect ws://localhost:3015",
+    "web": "tsx src/main.ts --web",
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest"

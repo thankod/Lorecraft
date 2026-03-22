@@ -148,7 +148,7 @@ async function main(): Promise<void> {
   const debug = hasFlag('--debug')
   const debugPath = debug ? (getArgValue('--debug') ?? './debug.log') : undefined
 
-  // --server [port]  → start WebSocket server
+  // --server [port]  → start WebSocket server (+ optional web frontend)
   if (hasFlag('--server')) {
     const port = parseInt(getArgValue('--server') ?? process.env.PORT ?? '3015', 10)
     const { GameServer } = await import('./server/game-server.js')
@@ -156,6 +156,33 @@ async function main(): Promise<void> {
     const server = new GameServer({ port, provider, debug: debugPath })
     await server.start()
     console.log(`Lorecraft server listening on ws://localhost:${port}`)
+
+    // --web [port]  → also start web frontend
+    if (hasFlag('--web')) {
+      const webPort = parseInt(getArgValue('--web') ?? '3016', 10)
+      const { WebServer } = await import('./web/web-server.js')
+      const web = new WebServer({ port: webPort, wsPort: port })
+      await web.start()
+      console.log(`Lorecraft web UI at http://localhost:${webPort}`)
+    }
+
+    if (debug) console.log(`[DEBUG] 调试日志: ${debugPath}`)
+    return
+  }
+
+  // --web [port]  → start both server and web frontend
+  if (hasFlag('--web')) {
+    const wsPort = parseInt(process.env.PORT ?? '3015', 10)
+    const webPort = parseInt(getArgValue('--web') ?? '3016', 10)
+    const { GameServer } = await import('./server/game-server.js')
+    const { WebServer } = await import('./web/web-server.js')
+    const provider = createProvider()
+    const server = new GameServer({ port: wsPort, provider, debug: debugPath })
+    await server.start()
+    const web = new WebServer({ port: webPort, wsPort: wsPort })
+    await web.start()
+    console.log(`Lorecraft server listening on ws://localhost:${wsPort}`)
+    console.log(`Lorecraft web UI at http://localhost:${webPort}`)
     if (debug) console.log(`[DEBUG] 调试日志: ${debugPath}`)
     return
   }
