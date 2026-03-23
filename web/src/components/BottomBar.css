@@ -63,3 +63,45 @@
   opacity: 0.4;
   cursor: default;
 }
+
+/* Insistence prompt */
+.insistence-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.insistence-hint {
+  flex: 1;
+  color: var(--voice);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.insist-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.insist-confirm {
+  background: rgba(208, 64, 64, 0.15);
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.insist-confirm:hover {
+  background: rgba(208, 64, 64, 0.3);
+}
+
+.insist-abandon {
+  background: var(--bg-elevated);
+  color: var(--system);
+}
+
+.insist-abandon:hover {
+  background: var(--border);
+}

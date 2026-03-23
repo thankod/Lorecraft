@@ -76,6 +76,7 @@ export interface GameEventListener {
   onNarrative(text: string, source: string): void
   onVoices(voices: Array<{ trait_id: string; line: string }>): void
   onCheck?(check: AttributeCheckResult): void
+  onInsistencePrompt?(voices: Array<{ trait_id: string; line: string }>): void
   onStatus(location: string, turn: number): void
   onError(message: string): void
   onInitProgress(step: string): void
@@ -111,6 +112,7 @@ export class GameLoop {
   private gameState: GameState | null = null
   private listener: GameEventListener | null = null
   private insistenceState: InsistenceState = 'NORMAL'
+  private pendingInsistInput: string | null = null
   private pendingAttributes: PlayerAttributes | null = null
   private awaitingCharConfirm = false
 
@@ -262,6 +264,26 @@ export class GameLoop {
     return this.awaitingCharConfirm
   }
 
+  get isAwaitingInsist(): boolean {
+    return this.pendingInsistInput !== null
+  }
+
+  /** Player insists on the action that triggered voice warnings */
+  async insist(): Promise<void> {
+    const input = this.pendingInsistInput
+    if (!input) return
+    this.pendingInsistInput = null
+    // insistenceState is already WARNED from the short-circuit, so re-running
+    // the same input will proceed with force_flag=true
+    await this.processInput(input)
+  }
+
+  /** Player abandons the action */
+  abandon(): void {
+    this.pendingInsistInput = null
+    this.insistenceState = 'NORMAL'
+  }
+
   reset(): void {
     // Re-create all in-memory stores, wiping all state
     this.stateStore = new InMemoryStateStore()
@@ -293,6 +315,7 @@ export class GameLoop {
 
     this.gameState = null
     this.insistenceState = 'NORMAL'
+    this.pendingInsistInput = null
     this.pendingAttributes = null
     this.awaitingCharConfirm = false
   }
@@ -370,13 +393,16 @@ export class GameLoop {
       // Send voices BEFORE narrative — inner thoughts precede the action
       if (result) {
         if (result.source === 'reflection') {
-          // Reflection short-circuit: only voices, no narrative
+          // Reflection short-circuit: voices warn the player, prompt to insist or abandon
           const reflectionOutput = context.data.get('reflection_output') as
             | { voices: Array<{ trait_id: string; line: string }> }
             | undefined
-          if (reflectionOutput?.voices?.length) {
-            this.listener?.onVoices(reflectionOutput.voices)
+          const voices = reflectionOutput?.voices ?? []
+          if (voices.length) {
+            this.listener?.onVoices(voices)
           }
+          this.pendingInsistInput = playerInput
+          this.listener?.onInsistencePrompt?.(voices)
         } else {
           // Normal flow: voices first, then check, then narrative
           const voices = context.data.get('voice_lines') as

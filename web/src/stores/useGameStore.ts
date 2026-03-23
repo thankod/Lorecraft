@@ -55,6 +55,9 @@ interface GameState {
   // Character creation
   charCreate: CharCreateState | null
 
+  // Insistence prompt
+  insistencePrompt: boolean
+
   // Debug
   debugTurns: DebugTurn[]
 
@@ -68,6 +71,7 @@ interface GameState {
   setInputEnabled: (v: boolean) => void
   setInitDoc: (doc: any) => void
   setCharCreate: (state: CharCreateState | null) => void
+  setInsistencePrompt: (v: boolean) => void
   resetGame: () => void
   debugTurnStart: (turn: number, input: string) => void
   debugStepEvent: (entry: DebugStepEntry) => void
@@ -90,6 +94,8 @@ export const useGameStore = create<GameState>((set) => ({
 
   charCreate: null,
 
+  insistencePrompt: false,
+
   debugTurns: [],
 
   setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
@@ -106,6 +112,7 @@ export const useGameStore = create<GameState>((set) => ({
   setInputEnabled: (inputEnabled) => set({ inputEnabled }),
   setInitDoc: (initDoc) => set({ initDoc }),
   setCharCreate: (charCreate) => set({ charCreate }),
+  setInsistencePrompt: (insistencePrompt) => set({ insistencePrompt }),
 
   resetGame: () =>
     set({
@@ -117,6 +124,7 @@ export const useGameStore = create<GameState>((set) => ({
       inputEnabled: false,
       initDoc: null,
       charCreate: null,
+      insistencePrompt: false,
       debugTurns: [],
     }),
 

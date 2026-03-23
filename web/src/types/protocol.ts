@@ -6,6 +6,8 @@ export type ClientMessage =
   | { type: 'reroll_attributes' }
   | { type: 'confirm_attributes'; attributes: Record<string, number> }
   | { type: 'reset' }
+  | { type: 'insist' }
+  | { type: 'abandon' }
 
 export type ServerMessage =
   | { type: 'narrative'; text: string; source: string }
@@ -23,3 +25,5 @@ export type ServerMessage =
   | { type: 'debug_step'; step: string; phase: 'start' | 'end'; status?: string; duration_ms?: number; data?: string }
   | { type: 'debug_state'; states: Record<string, unknown> }
   | { type: 'reset_complete' }
+  | { type: 'history'; messages: ServerMessage[] }
+  | { type: 'insistence_prompt' }

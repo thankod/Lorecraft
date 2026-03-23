@@ -13,6 +13,8 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('reroll_attributes') }),
   z.object({ type: z.literal('confirm_attributes'), attributes: PlayerAttributesSchema }),
   z.object({ type: z.literal('reset') }),
+  z.object({ type: z.literal('insist') }),
+  z.object({ type: z.literal('abandon') }),
 ])
 
 export type ClientMessage = z.infer<typeof ClientMessageSchema>
@@ -37,3 +39,5 @@ export type ServerMessage =
   | { type: 'debug_step'; step: string; phase: 'start' | 'end'; status?: string; duration_ms?: number; data?: string }
   | { type: 'debug_state'; states: Record<string, unknown> }
   | { type: 'reset_complete' }
+  | { type: 'history'; messages: ServerMessage[] }
+  | { type: 'insistence_prompt' }

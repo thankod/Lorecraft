@@ -13,8 +13,15 @@ import type { ServerMessage } from './protocol.js'
 // WsBridge — forwards GameEventListener calls to a WebSocket
 // ============================================================
 
+/** Message types worth replaying on reconnect */
+const HISTORY_TYPES = new Set([
+  'narrative', 'voices', 'check', 'status', 'init_progress',
+  'init_complete', 'char_create', 'error', 'save_result', 'save_error',
+])
+
 class WsBridge implements GameEventListener {
   private ws: WebSocket | null = null
+  private _history: ServerMessage[] = []
 
   attach(ws: WebSocket): void {
     this.ws = ws
@@ -28,7 +35,25 @@ class WsBridge implements GameEventListener {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN
   }
 
+  get history(): ServerMessage[] {
+    return this._history
+  }
+
+  clearHistory(): void {
+    this._history = []
+  }
+
   send(msg: ServerMessage): void {
+    if (HISTORY_TYPES.has(msg.type)) {
+      this._history.push(msg)
+    }
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(msg))
+    }
+  }
+
+  /** Send a message without recording it in history */
+  sendDirect(msg: ServerMessage): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg))
     }
@@ -56,6 +81,10 @@ class WsBridge implements GameEventListener {
 
   onInitComplete(doc: GenesisDocument): void {
     this.send({ type: 'init_complete', doc })
+  }
+
+  onInsistencePrompt(): void {
+    this.send({ type: 'insistence_prompt' })
   }
 
   onCheck(check: AttributeCheckResult): void {
@@ -111,6 +140,7 @@ export class GameServer {
   private initialized = false
   private initializing = false
   private genesisDoc: GenesisDocument | null = null
+  private pendingInsistInput: string | null = null
 
   constructor(options: GameServerOptions) {
     this.options = options
@@ -135,17 +165,13 @@ export class GameServer {
         this.bridge.detach()
         this.bridge.attach(ws)
 
-        // If game is already initialized, replay state to the new client
-        if (this.initialized && this.genesisDoc) {
-          this.bridge.send({ type: 'init_complete', doc: this.genesisDoc })
-          const state = this.gameLoop.getGameState()
-          if (state) {
-            this.bridge.send({ type: 'status', location: state.currentLocation, turn: state.currentTurn })
+        // Replay history to the new client if there's anything to replay
+        if (this.bridge.history.length > 0) {
+          this.bridge.sendDirect({ type: 'history', messages: this.bridge.history })
+          // If still in char creation, re-trigger char_create so overlay shows
+          if (this.gameLoop.isAwaitingCharConfirm) {
+            this.gameLoop.rerollAttributes()
           }
-        } else if (this.gameLoop.isAwaitingCharConfirm && this.genesisDoc) {
-          // World generated but char not confirmed yet — replay char_create
-          this.bridge.send({ type: 'init_complete', doc: this.genesisDoc })
-          this.gameLoop.rerollAttributes()
         }
 
         ws.on('message', async (data) => {
@@ -187,20 +213,14 @@ export class GameServer {
         break
 
       case 'initialize':
-        if (this.initialized) {
-          // Already initialized — just replay state
-          if (this.genesisDoc) {
-            this.bridge.send({ type: 'init_complete', doc: this.genesisDoc })
-            const state = this.gameLoop.getGameState()
-            if (state) {
-              this.bridge.send({ type: 'status', location: state.currentLocation, turn: state.currentTurn })
-            }
+        if (this.initialized || this.gameLoop.isAwaitingCharConfirm) {
+          // Already in progress or done — replay history instead of re-initializing
+          if (this.bridge.history.length > 0) {
+            this.bridge.sendDirect({ type: 'history', messages: this.bridge.history })
           }
-          return
-        }
-        if (this.gameLoop.isAwaitingCharConfirm) {
-          // World already generated, still waiting for char confirmation — re-send char_create
-          this.gameLoop.rerollAttributes()
+          if (this.gameLoop.isAwaitingCharConfirm) {
+            this.gameLoop.rerollAttributes()
+          }
           return
         }
         if (this.initializing) {
@@ -271,7 +291,25 @@ export class GameServer {
         this.initialized = false
         this.initializing = false
         this.genesisDoc = null
+        this.bridge.clearHistory()
+        this.pendingInsistInput = null
         this.bridge.send({ type: 'reset_complete' })
+        break
+
+      case 'insist':
+        if (!this.gameLoop.isAwaitingInsist) {
+          this.bridge.send({ type: 'error', message: '当前没有待确认的行动' })
+          return
+        }
+        await this.gameLoop.insist()
+        break
+
+      case 'abandon':
+        if (!this.gameLoop.isAwaitingInsist) {
+          return
+        }
+        this.gameLoop.abandon()
+        this.bridge.send({ type: 'narrative', text: '你改变了主意。', source: 'system' })
         break
     }
   }

@@ -79,6 +79,12 @@ export function useWebSocket() {
       const s = store.getState()
 
       switch (msg.type) {
+        case 'insistence_prompt':
+          // Voices already displayed — show insistence confirmation buttons
+          s.setProcessing(false)
+          s.setInsistencePrompt(true)
+          break
+
         case 'narrative': {
           const cls = msg.source === 'rejection' ? 'rejection'
             : msg.source === 'inciting_event' ? 'inciting'
@@ -175,6 +181,18 @@ export function useWebSocket() {
 
         case 'debug_state':
           s.debugSetState(msg.states)
+          break
+
+        case 'history':
+          // Reconnect: clear narrative and replay all history
+          s.resetGame()
+          for (const m of msg.messages) {
+            handleMessage(m)
+          }
+          // Re-enable input if game was in progress
+          if (store.getState().initDoc && !store.getState().charCreate) {
+            store.getState().setInputEnabled(true)
+          }
           break
 
         case 'reset_complete':
