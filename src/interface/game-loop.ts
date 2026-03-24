@@ -1,10 +1,7 @@
 import type { ILLMProvider } from '../ai/runner/llm-provider.js'
 import { AgentRunner } from '../ai/runner/agent-runner.js'
-import { InMemoryStateStore } from '../infrastructure/storage/state-store.js'
-import { InMemoryEventStore } from '../infrastructure/storage/event-store.js'
-import { InMemoryLoreStore } from '../infrastructure/storage/lore-store.js'
-import { InMemoryLongTermMemoryStore } from '../infrastructure/storage/long-term-memory-store.js'
-import { InMemorySessionStore } from '../infrastructure/storage/session-store.js'
+import { SQLiteStore } from '../infrastructure/storage/sqlite-store.js'
+import type { IStateStore, IEventStore, ILoreStore, ILongTermMemoryStore, ISessionStore } from '../infrastructure/storage/interfaces.js'
 import { MainPipeline, PipelineExecutionError, createPipelineContext } from '../orchestration/pipeline/index.js'
 import type { NarrativeOutput } from '../orchestration/pipeline/types.js'
 import { InitializationAgent } from '../domain/services/initialization-agent.js'
@@ -22,6 +19,7 @@ import { NPCIntentGenerator } from '../domain/services/npc-intent-generator.js'
 import {
   ValidationStep,
   InputParserStep,
+  WorldAssertionFilterStep,
   ActionValidationStep,
   ToneSignalStep,
 } from '../orchestration/steps/input-steps.js'
@@ -94,11 +92,12 @@ export interface GameEventListener {
 // ============================================================
 
 export class GameLoop {
-  private stateStore: InMemoryStateStore
-  private eventStore: InMemoryEventStore
-  private loreStore: InMemoryLoreStore
-  private longTermMemoryStore: InMemoryLongTermMemoryStore
-  private sessionStore: InMemorySessionStore
+  private sqliteStore: SQLiteStore
+  private stateStore: IStateStore
+  private eventStore: IEventStore
+  private loreStore: ILoreStore
+  private longTermMemoryStore: ILongTermMemoryStore
+  private sessionStore: ISessionStore
   private injectionQueueManager: InMemoryInjectionQueueManager
   private agentRunner: AgentRunner
   private signalProcessor: SignalProcessor
@@ -122,12 +121,13 @@ export class GameLoop {
   private awaitingStyleSelect = false
   private selectedStyle: StyleConfig | null = null
 
-  constructor(provider: ILLMProvider, options?: { debug?: boolean | string }) {
-    this.stateStore = new InMemoryStateStore()
-    this.eventStore = new InMemoryEventStore()
-    this.loreStore = new InMemoryLoreStore()
-    this.longTermMemoryStore = new InMemoryLongTermMemoryStore()
-    this.sessionStore = new InMemorySessionStore()
+  constructor(provider: ILLMProvider, options?: { debug?: boolean | string; dbPath?: string }) {
+    this.sqliteStore = new SQLiteStore(options?.dbPath ?? ':memory:')
+    this.stateStore = this.sqliteStore.asStateStore()
+    this.eventStore = this.sqliteStore.asEventStore()
+    this.loreStore = this.sqliteStore.asLoreStore()
+    this.longTermMemoryStore = this.sqliteStore.asLongTermMemoryStore()
+    this.sessionStore = this.sqliteStore.asSessionStore()
     this.injectionQueueManager = new InMemoryInjectionQueueManager()
     this.agentRunner = new AgentRunner(provider, {
       timeout_ms: 120_000,
@@ -314,12 +314,13 @@ export class GameLoop {
   }
 
   reset(): void {
-    // Re-create all in-memory stores, wiping all state
-    this.stateStore = new InMemoryStateStore()
-    this.eventStore = new InMemoryEventStore()
-    this.loreStore = new InMemoryLoreStore()
-    this.longTermMemoryStore = new InMemoryLongTermMemoryStore()
-    this.sessionStore = new InMemorySessionStore()
+    // Wipe all data in SQLite and re-create adapters
+    this.sqliteStore.resetAll()
+    this.stateStore = this.sqliteStore.asStateStore()
+    this.eventStore = this.sqliteStore.asEventStore()
+    this.loreStore = this.sqliteStore.asLoreStore()
+    this.longTermMemoryStore = this.sqliteStore.asLongTermMemoryStore()
+    this.sessionStore = this.sqliteStore.asSessionStore()
     this.injectionQueueManager = new InMemoryInjectionQueueManager()
     this.signalProcessor = new SignalProcessor(this.stateStore, this.configLoader.getTraitConfigs())
     this.locationGraph = new LocationGraph([])
@@ -400,21 +401,39 @@ export class GameLoop {
 
       // Attach streaming debug middleware
       const listener = this.listener
+      const runner = this.agentRunner
       pipeline.addMiddleware({
         before(step_name, _input, _ctx) {
+          // Drain any pending usage so we only capture this step's calls
+          runner.drainUsage()
           listener?.onDebugStep?.(step_name, 'start')
         },
         after(step_name, result, _ctx, duration_ms) {
           const status = result.status
+          // Collect token usage for LLM calls made during this step
+          const stepUsage = runner.drainUsage()
+          const tokenInfo = stepUsage.length > 0
+            ? {
+                input_tokens: stepUsage.reduce((s, u) => s + u.input_tokens, 0),
+                output_tokens: stepUsage.reduce((s, u) => s + u.output_tokens, 0),
+                llm_calls: stepUsage.length,
+              }
+            : undefined
+
           let data: string | undefined
           try {
-            if (result.status === 'continue') {
-              data = JSON.stringify(result.data, null, 2)
-            } else if (result.status === 'short_circuit') {
-              data = JSON.stringify(result.output, null, 2)
-            } else if (result.status === 'error') {
-              data = JSON.stringify(result.error, null, 2)
+            const payload: Record<string, unknown> = {}
+            if (tokenInfo) {
+              payload.tokens = tokenInfo
             }
+            if (result.status === 'continue') {
+              payload.result = result.data
+            } else if (result.status === 'short_circuit') {
+              payload.result = result.output
+            } else if (result.status === 'error') {
+              payload.result = result.error
+            }
+            data = JSON.stringify(payload, null, 2)
           } catch {
             data = '[unserializable]'
           }
@@ -644,6 +663,7 @@ export class GameLoop {
     // Input stage
     pipeline.addStep(new ValidationStep())
     pipeline.addStep(new InputParserStep(this.agentRunner))
+    pipeline.addStep(new WorldAssertionFilterStep())
     pipeline.addStep(new ActionValidationStep())
     pipeline.addStep(new ToneSignalStep())
 

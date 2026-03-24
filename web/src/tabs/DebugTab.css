@@ -110,6 +110,20 @@
   font-family: monospace;
 }
 
+.debug-step-tokens {
+  color: var(--voice);
+  font-size: 11px;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.debug-turn-tokens {
+  color: var(--voice);
+  font-size: 11px;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
 .debug-step-spinner {
   color: var(--highlight);
   animation: spin 1s linear infinite;

@@ -148,6 +148,7 @@ export interface GameServerOptions {
   port: number
   provider: ILLMProvider
   debug?: boolean | string
+  dbPath?: string
 }
 
 export class GameServer {
@@ -165,7 +166,10 @@ export class GameServer {
   constructor(options: GameServerOptions) {
     this.options = options
     this.bridge = new WsBridge()
-    this.gameLoop = new GameLoop(options.provider, options.debug ? { debug: options.debug } : undefined)
+    this.gameLoop = new GameLoop(options.provider, {
+      debug: options.debug,
+      dbPath: options.dbPath,
+    })
     this.gameLoop.setListener(this.bridge)
   }
 

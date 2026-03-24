@@ -93,13 +93,35 @@ export function useWebSocket() {
           break
 
         case 'narrative': {
-          const cls = msg.source === 'rejection' ? 'rejection'
+          const baseClass = msg.source === 'rejection' ? 'rejection'
             : msg.source === 'inciting_event' ? 'inciting'
             : 'event'
           const prefix = msg.source === 'rejection' ? '[旁白] '
             : msg.source === 'inciting_event' ? '[序幕] '
             : ''
-          s.appendNarrative(prefix + msg.text, cls)
+
+          // Split narrative into paragraphs — handle both real newlines and literal \n
+          const normalized = msg.text.replace(/\\n/g, '\n')
+          const paragraphs = normalized.split(/\n\n+/).map(p => p.trim()).filter(Boolean)
+          if (paragraphs.length <= 1) {
+            // Single paragraph or non-event source — render as before
+            s.appendNarrative(prefix + msg.text, baseClass)
+          } else {
+            for (const para of paragraphs) {
+              if (/^「.*」$/.test(para)) {
+                s.appendNarrative(para, 'dialogue')
+              } else if (/^『.*』$/.test(para)) {
+                s.appendNarrative(para, 'sound')
+              } else if (/「.*」/.test(para)) {
+                // Paragraph contains inline dialogue — still mark as dialogue
+                s.appendNarrative(para, 'dialogue')
+              } else {
+                s.appendNarrative(para, baseClass)
+              }
+              // Spacer between paragraphs
+              s.appendNarrative('', 'spacer')
+            }
+          }
           if (s.isProcessing) {
             s.setProcessing(false)
             s.setInputEnabled(true)

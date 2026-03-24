@@ -150,10 +150,13 @@ export class VoiceGenerationStep implements IPipelineStep<ParsedIntent, ParsedIn
       '- TAUNT: mocks or challenges playfully',
       '- WARN: ONLY for genuinely dangerous actions (trap, vastly superior enemy). Routine actions NEVER get WARN.',
       '',
+      'WORLD ASSERTION: If world_assertion_hint is provided, the player tried to control the world (e.g. deciding who appears, what they find). One voice MUST gently remind the player that they can only control their own actions — the world decides the rest. Keep it brief, in-character, and non-breaking (1 sentence). Use the most relevant voice personality for the hint.',
       'IMPORTANT: trait_id must be the Chinese display_name provided (e.g. "力量", "感知"), NOT the English id.',
       '',
       'Respond with ONLY valid JSON: { "voices": [{ "trait_id": string, "line": string, "stance": "WARN"|"SUPPORT"|"QUESTION"|"TAUNT" }], "debate_needed": boolean }',
     ].join('\n')
+
+    const worldAssertionHint = context.data.get('world_assertion_hint') as string | null
 
     const userMessage = JSON.stringify({
       active_voices: activeVoices.map((v) => ({
@@ -165,6 +168,7 @@ export class VoiceGenerationStep implements IPipelineStep<ParsedIntent, ParsedIn
       intent_summary: input.intent,
       atomic_actions: input.atomic_actions,
       injected_context: injectedContext,
+      world_assertion_hint: worldAssertionHint,
     })
 
     try {

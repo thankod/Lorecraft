@@ -35,12 +35,19 @@ function TurnBlock({ turn, isLast }: { turn: DebugTurn; isLast: boolean }) {
   // Group step entries into pairs (start + end)
   const steps = groupSteps(turn.steps)
 
+  // Sum tokens across all steps
+  const totalIn = steps.reduce((s, st) => s + (st.tokens?.input_tokens ?? 0), 0)
+  const totalOut = steps.reduce((s, st) => s + (st.tokens?.output_tokens ?? 0), 0)
+
   return (
     <div className="debug-turn">
       <div className="debug-turn-header" onClick={() => setExpanded(!expanded)}>
         <span className="debug-chevron">{expanded ? '▼' : '▶'}</span>
         <span className="debug-turn-label">回合 {turn.turn}</span>
         <span className="debug-turn-input">{turn.input}</span>
+        {totalIn > 0 && (
+          <span className="debug-turn-tokens">in:{totalIn} out:{totalOut}</span>
+        )}
         <span className="debug-turn-count">{steps.length} 步</span>
       </div>
       {expanded && (
@@ -55,11 +62,18 @@ function TurnBlock({ turn, isLast }: { turn: DebugTurn; isLast: boolean }) {
   )
 }
 
+interface StepTokens {
+  input_tokens: number
+  output_tokens: number
+  llm_calls: number
+}
+
 interface GroupedStep {
   name: string
   status: string
   duration_ms?: number
   data?: string
+  tokens?: StepTokens
   running: boolean
 }
 
@@ -80,6 +94,15 @@ function groupSteps(entries: DebugStepEntry[]): GroupedStep[] {
           g.status = e.status ?? 'continue'
           g.duration_ms = e.duration_ms
           g.data = e.data
+          // Extract token info from data JSON
+          if (e.data) {
+            try {
+              const parsed = JSON.parse(e.data)
+              if (parsed.tokens) {
+                g.tokens = parsed.tokens as StepTokens
+              }
+            } catch { /* ignore */ }
+          }
           g.running = false
           break
         }
@@ -109,6 +132,11 @@ function StepNode({ step }: { step: GroupedStep }) {
         <span className="debug-step-name">{step.name}</span>
         {step.duration_ms != null && (
           <span className="debug-step-time">{step.duration_ms}ms</span>
+        )}
+        {step.tokens && (
+          <span className="debug-step-tokens">
+            in:{step.tokens.input_tokens} out:{step.tokens.output_tokens}
+          </span>
         )}
         {step.running && <span className="debug-step-spinner">⟳</span>}
         {step.status === 'short_circuit' && <span className="debug-step-tag sc">短路</span>}

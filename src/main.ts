@@ -148,12 +148,18 @@ async function main(): Promise<void> {
   const debug = hasFlag('--debug')
   const debugPath = debug ? (getArgValue('--debug') ?? './debug.log') : undefined
 
+  // Database path: --db <path> or default to ~/.local/share/lorecraft/game.db
+  const xdgData = process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share')
+  const dbPath = getArgValue('--db') ?? join(xdgData, 'lorecraft', 'game.db')
+
+  console.log(`[DB] ${dbPath}`)
+
   // --server [port]  → start WebSocket server (+ optional web frontend)
   if (hasFlag('--server')) {
     const port = parseInt(getArgValue('--server') ?? process.env.PORT ?? '3015', 10)
     const { GameServer } = await import('./server/game-server.js')
     const provider = createProvider()
-    const server = new GameServer({ port, provider, debug: debugPath })
+    const server = new GameServer({ port, provider, debug: debugPath, dbPath })
     await server.start()
     console.log(`Lorecraft server listening on ws://localhost:${port}`)
 
@@ -177,7 +183,7 @@ async function main(): Promise<void> {
     const { GameServer } = await import('./server/game-server.js')
     const { WebServer } = await import('./web/web-server.js')
     const provider = createProvider()
-    const server = new GameServer({ port: wsPort, provider, debug: debugPath })
+    const server = new GameServer({ port: wsPort, provider, debug: debugPath, dbPath })
     await server.start()
     const web = new WebServer({ port: webPort, wsPort: wsPort })
     await web.start()
@@ -203,7 +209,7 @@ async function main(): Promise<void> {
 
   const provider = createProvider()
   const { TUIApp } = await import('./interface/tui.js')
-  const app = new TUIApp(provider, debug ? { debug: debugPath } : undefined)
+  const app = new TUIApp(provider, { debug: debugPath, dbPath })
   await app.start()
 }
 

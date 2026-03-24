@@ -38,7 +38,7 @@ export class TUIApp implements GameEventListener {
   private voiceLines: string[] = []
   private isProcessing = false
 
-  constructor(provider: ILLMProvider, options?: { debug?: boolean | string }) {
+  constructor(provider: ILLMProvider, options?: { debug?: boolean | string; dbPath?: string }) {
     this.gameLoop = new GameLoop(provider, options)
     this.gameLoop.setListener(this)
 

@@ -32,6 +32,7 @@ export const ParsedIntentSchema = z.object({
   tone_signals: ToneSignalsSchema,
   atomic_actions: z.array(AtomicActionSchema).min(1),
   ambiguity_flags: z.array(z.string()),
+  world_assertions: z.array(z.string()).default([]),
 })
 
 export type ParsedIntent = z.infer<typeof ParsedIntentSchema>

@@ -30,6 +30,11 @@ function simpleHash(str: string): string {
 
 let callCounter = 0
 
+export interface TokenUsage {
+  input_tokens: number
+  output_tokens: number
+}
+
 export class AgentRunner {
   private provider: ILLMProvider
   private logs: LLMCallLog[] = []
@@ -39,6 +44,7 @@ export class AgentRunner {
   private language: string | undefined
   private debugPath: string | null
   private turnCounter = 0
+  private _pendingUsage: TokenUsage[] = []
 
   constructor(provider: ILLMProvider, options?: AgentRunnerOptions) {
     this.provider = provider
@@ -102,6 +108,10 @@ export class AgentRunner {
           timestamp: Date.now(),
         })
 
+        if (response.usage) {
+          this._pendingUsage.push(response.usage)
+        }
+
         this.writeDebug(callId, agentType, messages, duration, response.content)
 
         return response
@@ -130,6 +140,13 @@ export class AgentRunner {
     this.writeDebug(callId, agentType, messages, duration, null, lastError?.message)
 
     throw lastError
+  }
+
+  /** Drain all token usage accumulated since last drain. Used by debug middleware. */
+  drainUsage(): TokenUsage[] {
+    const usage = this._pendingUsage
+    this._pendingUsage = []
+    return usage
   }
 
   getLogs(): readonly LLMCallLog[] {

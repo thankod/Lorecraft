@@ -171,7 +171,15 @@ export class EventGeneratorStep
       'IMPORTANT: The player has full freedom to roleplay ANY personality. If the action is socially reckless, rude, absurd, or provocative, DO NOT soften or redirect it — faithfully execute the action and let the WORLD react with realistic consequences (NPCs get angry, guards intervene, allies lose trust, opportunities close, etc.). The player chose this; honor their agency.',
       'CRITICAL — NARRATIVE CONTINUITY: You MUST read the recent_narrative carefully. NPCs remember what just happened. If the player attacked or insulted an NPC in a previous turn, that NPC will NOT suddenly act friendly or ignore the conflict. NPC emotional states, injuries, hostilities, and relationship changes from recent events MUST carry forward. Breaking continuity is the worst possible error.',
       'ATTRIBUTE CHECK: If an attribute_check is provided, the narrative MUST reflect its outcome. If passed, the character succeeds at the skill-dependent part. If failed, the character fails or only partially succeeds — describe the failure naturally without breaking immersion.',
+      'PLAYER WISH: If player_wish is provided, it represents things the player HOPED would happen (e.g. encountering a specific NPC). You are NOT obligated to honor these wishes. Only incorporate them if they make narrative sense given the current context, location, and NPC states. If they don\'t make sense, simply ignore them — the world follows its own logic.',
       'DECISION POINT: The narrative MUST end at a moment that demands the player\'s next decision. Do NOT wrap up the scene into a neat conclusion. Instead, stop at a point of tension, a fork in the road, or an unresolved situation where the player must choose what to do next. Examples: an NPC asks a question and waits for an answer; a new threat appears; the player faces two or more possible next moves; a consequence is about to unfold and the player can still react. The player should never feel "the scene is over, now what?" — they should feel "I need to act NOW."',
+      'FORMATTING RULES for narrative_text:',
+      '- Separate paragraphs with \\n\\n (double newline). NEVER write a wall of text.',
+      '- Each paragraph should focus on one beat: a description, an action, or a dialogue line.',
+      '- NPC dialogue MUST be wrapped in 「」 (e.g. 「这么晚了，还在收拾？」). Each dialogue line should be its own paragraph.',
+      '- Sound effects or environmental sounds use 『』 (e.g. 『滋——滋滋——』). Each sound should be its own paragraph.',
+      '- Player character actions and scene descriptions are plain text paragraphs.',
+      '- Keep paragraphs short — 1-3 sentences max. Dense prose kills readability.',
       forceInstruction,
       pacingInstruction,
       'Respond with ONLY valid JSON: { "title": string, "tags": string[], "weight": "PRIVATE"|"MINOR"|"SIGNIFICANT"|"MAJOR", "summary": string, "context": string, "narrative_text": string, "state_changes": [{ "target": string, "field": string, "change_description": string }] }',
@@ -187,6 +195,9 @@ export class EventGeneratorStep
     const recentNarrative = context.data.get('event_recent_narrative') as string[] | undefined
     const knownFacts = context.data.get('event_known_facts') as string[] | undefined
 
+    // Player wish from world assertions — low-priority, may or may not happen
+    const playerWish = context.data.get('player_wish') as string[] | undefined
+
     const userMessage = JSON.stringify({
       action: input.action,
       force_flag: input.force_flag,
@@ -196,6 +207,7 @@ export class EventGeneratorStep
       recent_narrative: recentNarrative ?? [],
       known_facts: knownFacts ?? [],
       attribute_check: checkDesc ? { description: checkDesc, passed: checkPassed } : null,
+      player_wish: playerWish ?? null,
     })
 
     try {
