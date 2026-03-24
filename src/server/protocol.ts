@@ -34,7 +34,7 @@ export type ClientMessage = z.infer<typeof ClientMessageSchema>
 export type ServerMessage =
   | { type: 'narrative'; text: string; source: string }
   | { type: 'voices'; voices: Array<{ trait_id: string; line: string }> }
-  | { type: 'check'; attribute: string; difficulty: string; target: number; roll: number; attribute_value: number; total: number; passed: boolean }
+  | { type: 'check'; attribute: string; difficulty: string; base_target: number; modifiers: Array<{ label: string; value: number }>; target: number; roll: number; attribute_value: number; total: number; passed: boolean }
   | { type: 'status'; location: string; turn: number }
   | { type: 'error'; message: string; retryable?: boolean }
   | { type: 'init_progress'; step: string }

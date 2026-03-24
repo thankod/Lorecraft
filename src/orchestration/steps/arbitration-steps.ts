@@ -152,11 +152,18 @@ export class FeasibilityCheckStep implements IPipelineStep<AtomicAction, AtomicA
 // AttributeCheckStep — d100 + attribute vs target (DM decides)
 // ============================================================
 
+export interface CheckModifier {
+  label: string    // e.g. "目标处于愤怒状态"
+  value: number    // positive = harder, negative = easier
+}
+
 export interface AttributeCheckResult {
   needed: boolean
   attribute_id?: string
   attribute_display_name?: string
   difficulty?: string
+  base_target?: number
+  modifiers?: CheckModifier[]
   target?: number
   roll?: number
   attribute_value?: number
@@ -181,10 +188,16 @@ function rollTarget(difficulty: string): number {
   return min + Math.floor(Math.random() * (max - min + 1))
 }
 
+const CheckModifierSchema = z.object({
+  label: z.string(),
+  value: z.number().int(),
+})
+
 const CheckDecisionSchema = z.object({
   needs_check: z.boolean(),
   attribute: z.string().nullable(),
   difficulty: z.string().nullable(),
+  modifiers: z.array(CheckModifierSchema).nullable(),
   reason: z.string().nullable(),
 })
 
@@ -234,9 +247,21 @@ export class AttributeCheckStep implements IPipelineStep<AtomicAction, AtomicAct
       '',
       `Player attributes:\n${attrList}`,
       '',
+      'DIFFICULTY has two parts:',
+      '1. BASE DIFFICULTY — the inherent difficulty of the action itself (one of the 5 levels above).',
+      '2. MODIFIERS — situational factors that raise or lower the final target number. Each modifier has a short label and a numeric value (positive = harder, negative = easier). Typical modifier range: -20 to +20 per factor.',
+      '',
+      'MODIFIER GUIDELINES (apply all that are relevant, omit those that don\'t apply):',
+      '- NPC attitude/emotional state: friendly NPC → -10~-15; hostile/angry NPC → +10~+20; neutral → 0 (omit)',
+      '- Environmental conditions: favorable (darkness for stealth, quiet room for focus) → -5~-15; unfavorable (bright light for stealth, noisy for persuasion) → +5~+15',
+      '- Prior preparation: player scouted, gathered info, or set up for this → -10~-20',
+      '- Repeated attempt: retrying a just-failed action → +10~+15 (target is alert/window closing)',
+      '- Pressure/stakes: life-threatening or irreversible situation → +5~+10',
+      '- Tool/resource advantage: player has a relevant tool or item → -5~-15',
+      '',
       'Choose the MOST relevant single attribute for the check.',
-      'IMPORTANT: Do NOT look at the player\'s attribute values when deciding difficulty. Difficulty is determined by the action and situation, not by how good the player is at it.',
-      'Respond with ONLY valid JSON: { "needs_check": boolean, "attribute": "attribute_id"|null, "difficulty": "TRIVIAL"|"ROUTINE"|"HARD"|"VERY_HARD"|"LEGENDARY"|null, "reason": string|null }',
+      'IMPORTANT: Do NOT look at the player\'s attribute values when deciding difficulty. Difficulty is determined by the action and situation — not by how good the player is at it.',
+      'Respond with ONLY valid JSON: { "needs_check": boolean, "attribute": "attribute_id"|null, "difficulty": "TRIVIAL"|"ROUTINE"|"HARD"|"VERY_HARD"|"LEGENDARY"|null, "modifiers": [{ "label": "short reason", "value": number }]|null, "reason": string|null }',
     ].join('\n')
 
     const userMessage = JSON.stringify({
@@ -263,7 +288,14 @@ export class AttributeCheckStep implements IPipelineStep<AtomicAction, AtomicAct
 
       const decision = result.data
       const difficulty = DIFFICULTY_IDS.includes(decision.difficulty as any) ? decision.difficulty! : 'ROUTINE'
-      const target = rollTarget(difficulty)
+      const baseTarget = rollTarget(difficulty)
+      const modifiers: CheckModifier[] = (decision.modifiers ?? []).map((m) => ({
+        label: m.label,
+        value: Math.max(-30, Math.min(30, m.value)),  // clamp to [-30, 30]
+      }))
+      const modifierSum = modifiers.reduce((sum, m) => sum + m.value, 0)
+      const target = Math.max(10, baseTarget + modifierSum)  // floor at 10
+
       const attrId = decision.attribute as keyof PlayerAttributes
       const meta = ATTRIBUTE_META[attrId as typeof ATTRIBUTE_IDS[number]]
       if (!meta) {
@@ -282,6 +314,8 @@ export class AttributeCheckStep implements IPipelineStep<AtomicAction, AtomicAct
         attribute_id: attrId,
         attribute_display_name: meta.display_name,
         difficulty,
+        base_target: baseTarget,
+        modifiers,
         target,
         roll,
         attribute_value: attrValue,

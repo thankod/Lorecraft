@@ -110,6 +110,8 @@ class WsBridge implements GameEventListener {
         type: 'check',
         attribute: check.attribute_display_name,
         difficulty: check.difficulty ?? 'ROUTINE',
+        base_target: check.base_target ?? check.target!,
+        modifiers: check.modifiers ?? [],
         target: check.target!,
         roll: check.roll!,
         attribute_value: check.attribute_value!,

@@ -119,7 +119,19 @@ export function useWebSocket() {
           const diffLabel: Record<string, string> = { TRIVIAL: '轻松', ROUTINE: '普通', HARD: '困难', VERY_HARD: '极难', LEGENDARY: '传奇' }
           const result = msg.passed ? '成功' : '失败'
           const diff = diffLabel[msg.difficulty] ?? msg.difficulty
-          const line = `🎲 ${msg.attribute}检定[${diff}]: d100(${msg.roll}) + ${msg.attribute}(${msg.attribute_value}) = ${msg.total} vs 目标${msg.target} → ${result}`
+          // Build modifier breakdown
+          let modStr = ''
+          if (msg.modifiers && msg.modifiers.length > 0) {
+            const parts = msg.modifiers.map((m) => {
+              const sign = m.value >= 0 ? '+' : ''
+              return `${m.label}(${sign}${m.value})`
+            })
+            modStr = ` [${parts.join(', ')}]`
+          }
+          const targetStr = msg.modifiers && msg.modifiers.length > 0
+            ? `基础${msg.base_target}${modStr} = 目标${msg.target}`
+            : `目标${msg.target}`
+          const line = `🎲 ${msg.attribute}检定[${diff}]: d100(${msg.roll}) + ${msg.attribute}(${msg.attribute_value}) = ${msg.total} vs ${targetStr} → ${result}`
           s.appendNarrative(line, msg.passed ? 'check-pass' : 'check-fail')
           break
         }
