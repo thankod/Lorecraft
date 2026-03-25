@@ -1,5 +1,7 @@
 ---
-description: "Run a ~10 turn automated playtest session and generate an experience report"
+name: playtest
+description: Run a ~10 turn automated playtest session and generate an experience report
+disable-model-invocation: true
 ---
 
 # Playtest Skill
