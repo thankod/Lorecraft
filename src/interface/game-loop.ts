@@ -425,14 +425,16 @@ export class GameLoop {
       const runner = this.agentRunner
       pipeline.addMiddleware({
         before(step_name, _input, _ctx) {
-          // Drain any pending usage so we only capture this step's calls
+          // Drain any pending usage/calls so we only capture this step's calls
           runner.drainUsage()
+          runner.drainCalls()
           listener?.onDebugStep?.(step_name, 'start')
         },
         after(step_name, result, _ctx, duration_ms) {
           const status = result.status
           // Collect token usage for LLM calls made during this step
           const stepUsage = runner.drainUsage()
+          const stepCalls = runner.drainCalls()
           const tokenInfo = stepUsage.length > 0
             ? {
                 input_tokens: stepUsage.reduce((s, u) => s + u.input_tokens, 0),
@@ -454,13 +456,30 @@ export class GameLoop {
             } else if (result.status === 'error') {
               payload.result = result.error
             }
+            // Include LLM call details (summarized to avoid huge payloads)
+            if (stepCalls.length > 0) {
+              payload.llm_calls = stepCalls.map((c) => ({
+                agent_type: c.agent_type,
+                duration_ms: c.duration_ms,
+                usage: c.usage,
+                messages: c.messages.map((m) => ({
+                  role: m.role,
+                  content: m.content.length > 3000
+                    ? m.content.slice(0, 3000) + '\n... [truncated]'
+                    : m.content,
+                })),
+                response: c.response.length > 3000
+                  ? c.response.slice(0, 3000) + '\n... [truncated]'
+                  : c.response,
+              }))
+            }
             data = JSON.stringify(payload, null, 2)
           } catch {
             data = '[unserializable]'
           }
           // Truncate very large data to avoid flooding the WS
-          if (data && data.length > 4000) {
-            data = data.slice(0, 4000) + '\n... [truncated]'
+          if (data && data.length > 20000) {
+            data = data.slice(0, 20000) + '\n... [truncated]'
           }
           listener?.onDebugStep?.(step_name, 'end', status, Math.round(duration_ms * 100) / 100, data)
         },

@@ -278,7 +278,15 @@ export class GameServer {
             return
           }
         }
-        // No sessions — start initialization (sends style_select to client)
+        // No sessions — tell client there's no active game
+        this.bridge.send({ type: 'no_game' })
+        break
+
+      case 'new_game':
+        if (this.initialized || this.initializing) {
+          this.bridge.send({ type: 'error', message: '游戏已在进行中，请先重置' })
+          return
+        }
         await this.gameLoop.initialize()
         break
 

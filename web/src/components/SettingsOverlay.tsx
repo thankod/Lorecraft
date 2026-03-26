@@ -7,6 +7,7 @@ const PROVIDERS = [
   { value: 'gemini', label: 'Google Gemini' },
   { value: 'openai', label: 'OpenAI 官方' },
   { value: 'anthropic', label: 'Anthropic Claude' },
+  { value: 'xai', label: 'xAI Grok' },
 ] as const
 
 interface ProviderFields {

@@ -1,5 +1,6 @@
 export type ClientMessage =
   | { type: 'initialize' }
+  | { type: 'new_game' }
   | { type: 'input'; text: string }
   | { type: 'save' }
   | { type: 'ping' }
@@ -46,6 +47,7 @@ export type ServerMessage =
   | { type: 'llm_config_saved' }
   | { type: 'llm_test_result'; success: boolean; message: string }
   | { type: 'model_list'; models: string[] }
+  | { type: 'no_game' }
 
 export interface CharacterInfo {
   id: string

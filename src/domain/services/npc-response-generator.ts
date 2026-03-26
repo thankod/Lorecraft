@@ -2,6 +2,7 @@ import { z } from 'zod/v4'
 import type { AgentRunner } from '../../ai/runner/agent-runner.js'
 import type { LLMMessage } from '../../ai/runner/llm-provider.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
+import { prompts } from '../../ai/prompt/prompts.js'
 import type { IStateStore, ILoreStore, ILongTermMemoryStore } from '../../infrastructure/storage/interfaces.js'
 import type { CharacterDynamicState, ConversationHistory, MemoryBuffer, TierCTemplate } from '../models/character.js'
 import type { NPCProfile } from '../models/lore.js'
@@ -141,14 +142,11 @@ export class NPCResponseGenerator {
       throw new Error(`TierCTemplate not found for NPC: ${npc_id}`)
     }
 
-    const systemPrompt = [
-      `You are a ${template.type} NPC.`,
-      `Personality: ${template.personality_sketch}`,
-      `Response style: ${template.default_response_style}`,
-      '',
-      'Respond to the player in character. Output JSON:',
-      '{ "response_text": "...", "emotion_change": null, "relationship_change_signal": null }',
-    ].join('\n')
+    const systemPrompt = prompts.fill('npc_response_tier_c', {
+      npc_type: template.type,
+      personality_sketch: template.personality_sketch,
+      default_response_style: template.default_response_style,
+    })
 
     const messages: LLMMessage[] = [
       { role: 'system', content: systemPrompt },

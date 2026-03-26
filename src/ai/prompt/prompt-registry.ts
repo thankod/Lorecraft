@@ -16,12 +16,23 @@ export class PromptRegistry {
     return template
   }
 
+  /**
+   * Fill a prompt template with variables. Unfilled {{placeholders}} are removed
+   * along with their surrounding blank lines to keep the output clean.
+   */
   fill(name: string, variables: Record<string, string>): string {
     let template = this.get(name)
     for (const [key, value] of Object.entries(variables)) {
       template = template.replaceAll(`{{${key}}}`, value)
     }
-    return template
+    // Remove lines that are only unfilled placeholders (optional dynamic parts)
+    template = template
+      .split('\n')
+      .filter((line) => !/^\s*\{\{[a-z_]+\}\}\s*$/.test(line))
+      .join('\n')
+    // Collapse 3+ consecutive newlines into 2
+    template = template.replace(/\n{3,}/g, '\n\n')
+    return template.trim()
   }
 
   has(name: string): boolean {

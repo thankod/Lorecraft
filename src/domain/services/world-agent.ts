@@ -8,6 +8,7 @@ import type { RelationshipEntry } from '../models/character.js'
 import type { CharacterDynamicState, GoalQueueEntry } from '../models/character.js'
 import type { Event, EventTier1 } from '../models/event.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
+import { prompts } from '../../ai/prompt/prompts.js'
 
 // ============================================================
 // Zod schema for lazy evaluation LLM response
@@ -446,28 +447,7 @@ export class WorldAgent {
 // ============================================================
 
 function buildLazyEvalSystemPrompt(): string {
-  return `You are a world simulation engine for a CRPG. Your task is to infer what happened to a location or NPC during a period when the player was not present.
-
-Given the frozen state snapshot, elapsed time, and significant global events that occurred during that period, generate plausible inferred events and a current state description.
-
-Respond with valid JSON matching this schema:
-{
-  "inferred_events": [
-    {
-      "title": "Short event title",
-      "summary": "What happened",
-      "state_changes": ["Description of each state change"]
-    }
-  ],
-  "current_state_description": "Current state after all inferred events"
-}
-
-Guidelines:
-- Generate 0-3 inferred events based on elapsed time and significance of global events
-- Events should be plausible given the location/NPC context
-- For short elapsed periods with no significant global events, generate 0 events
-- State changes should be brief, descriptive strings
-- The current_state_description should reflect the state after all inferred events`
+  return prompts.get('lazy_eval')
 }
 
 function buildLazyEvalUserPrompt(

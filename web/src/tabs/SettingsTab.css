@@ -1,0 +1,203 @@
+.settings-tab {
+  padding: 20px 24px;
+  max-width: 520px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.settings-tab .settings-section {
+  margin-bottom: 24px;
+}
+
+.settings-tab .settings-section-title {
+  color: var(--highlight);
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 14px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-tab .settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.settings-tab .settings-field-label {
+  color: var(--system);
+  font-size: 12px;
+}
+
+.settings-tab .settings-select,
+.settings-tab .settings-input {
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--input-fg);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.settings-tab .settings-select:focus,
+.settings-tab .settings-input:focus {
+  border-color: var(--title);
+}
+
+.settings-tab .settings-input::placeholder {
+  color: var(--status);
+  opacity: 0.6;
+}
+
+.settings-tab .settings-key-row {
+  display: flex;
+  gap: 6px;
+}
+
+.settings-tab .settings-key-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-tab .settings-eye-btn {
+  flex: 0 0 36px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--system);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.settings-tab .settings-eye-btn:hover {
+  border-color: var(--title);
+  color: var(--title);
+}
+
+.settings-tab .settings-model-row {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-tab .settings-model-input,
+.settings-tab .settings-model-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-tab .settings-fetch-btn {
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--system);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.settings-tab .settings-fetch-btn:hover:not(:disabled) {
+  border-color: var(--title);
+  color: var(--title);
+}
+
+.settings-tab .settings-fetch-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.settings-tab .settings-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.settings-tab .settings-test-btn {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--system);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.settings-tab .settings-test-btn:hover:not(:disabled) {
+  border-color: var(--highlight);
+  color: var(--highlight);
+}
+
+.settings-tab .settings-test-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.settings-tab .settings-save-btn {
+  flex: 1;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--title);
+  border-radius: 4px;
+  color: var(--title);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.settings-tab .settings-save-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.settings-tab .settings-save-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.settings-tab .settings-test-result {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.settings-tab .settings-test-result.success {
+  background: rgba(80, 200, 120, 0.1);
+  border: 1px solid rgba(80, 200, 120, 0.4);
+  color: #50c878;
+}
+
+.settings-tab .settings-test-result.fail {
+  background: rgba(220, 80, 80, 0.1);
+  border: 1px solid rgba(220, 80, 80, 0.4);
+  color: #dc5050;
+}
+
+.settings-tab .settings-warn {
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: rgba(220, 180, 50, 0.1);
+  border: 1px solid rgba(220, 180, 50, 0.4);
+  color: #dcb432;
+}
+
+.settings-tab .settings-hint {
+  color: var(--status);
+  font-size: 11px;
+  margin-top: 2px;
+  opacity: 0.7;
+}

@@ -1,0 +1,3 @@
+Generate a topic for an NPC to steer conversation toward the narrative.
+The topic should feel natural, not forced.
+Respond with ONLY valid JSON: { "context": string, "condition": string }

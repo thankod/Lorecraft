@@ -35,6 +35,14 @@ export interface TokenUsage {
   output_tokens: number
 }
 
+export interface LLMCallDetail {
+  agent_type: string
+  messages: LLMMessage[]
+  response: string
+  duration_ms: number
+  usage?: TokenUsage
+}
+
 export class AgentRunner {
   private provider: ILLMProvider
   private logs: LLMCallLog[] = []
@@ -45,6 +53,7 @@ export class AgentRunner {
   private debugPath: string | null
   private turnCounter = 0
   private _pendingUsage: TokenUsage[] = []
+  private _pendingCalls: LLMCallDetail[] = []
 
   setProvider(provider: ILLMProvider): void {
     this.provider = provider
@@ -116,6 +125,14 @@ export class AgentRunner {
           this._pendingUsage.push(response.usage)
         }
 
+        this._pendingCalls.push({
+          agent_type: agentType,
+          messages: messages,
+          response: response.content,
+          duration_ms: duration,
+          usage: response.usage,
+        })
+
         this.writeDebug(callId, agentType, messages, duration, response.content)
 
         return response
@@ -151,6 +168,13 @@ export class AgentRunner {
     const usage = this._pendingUsage
     this._pendingUsage = []
     return usage
+  }
+
+  /** Drain all LLM call details accumulated since last drain. Used by debug middleware. */
+  drainCalls(): LLMCallDetail[] {
+    const calls = this._pendingCalls
+    this._pendingCalls = []
+    return calls
   }
 
   getLogs(): readonly LLMCallLog[] {

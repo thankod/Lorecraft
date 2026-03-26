@@ -1,16 +1,27 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
+import { HttpsProxyAgent } from 'https-proxy-agent'
 import type { ILLMProvider } from '../ai/runner/llm-provider.js'
 import { OpenAIProvider } from '../ai/runner/openai-provider.js'
 import { GeminiProvider } from '../ai/runner/gemini-provider.js'
 import { AnthropicProvider } from '../ai/runner/anthropic-provider.js'
 
+function getProxyAgent(): HttpsProxyAgent<string> | undefined {
+  const proxyUrl =
+    process.env.https_proxy ??
+    process.env.HTTPS_PROXY ??
+    process.env.http_proxy ??
+    process.env.HTTP_PROXY ??
+    process.env.ALL_PROXY
+  return proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined
+}
+
 // ============================================================
 // LLM Config Types
 // ============================================================
 
-export type LLMProviderType = 'openai_compatible' | 'gemini' | 'openai' | 'anthropic'
+export type LLMProviderType = 'openai_compatible' | 'gemini' | 'openai' | 'anthropic' | 'xai'
 
 export interface LLMConfig {
   provider: LLMProviderType
@@ -58,6 +69,11 @@ export function detectEnvConfig(): LLMConfig | null {
     if (key) return { provider: 'anthropic', api_key: key, model: process.env.ANTHROPIC_MODEL ?? '' }
   }
 
+  if (providerName === 'xai' || providerName === 'grok') {
+    const key = process.env.XAI_API_KEY
+    if (key) return { provider: 'xai', api_key: key, model: process.env.XAI_MODEL ?? '' }
+  }
+
   if (providerName === 'openai' || providerName === 'openai-compatible') {
     const key = process.env.OPENAI_API_KEY
     if (key) return {
@@ -74,6 +90,9 @@ export function detectEnvConfig(): LLMConfig | null {
   }
   if (process.env.ANTHROPIC_API_KEY) {
     return { provider: 'anthropic', api_key: process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_MODEL ?? '' }
+  }
+  if (process.env.XAI_API_KEY) {
+    return { provider: 'xai', api_key: process.env.XAI_API_KEY, model: process.env.XAI_MODEL ?? '' }
   }
   if (process.env.OPENAI_API_KEY) {
     return {
@@ -115,6 +134,13 @@ export function createProviderFromConfig(config: LLMConfig): ILLMProvider {
         model: config.model || undefined,
       })
 
+    case 'xai':
+      return new OpenAIProvider({
+        apiKey: config.api_key,
+        model: config.model || undefined,
+        baseURL: 'https://api.x.ai/v1',
+      })
+
     default:
       throw new Error(`Unknown provider type: ${config.provider}`)
   }
@@ -140,11 +166,25 @@ export async function testLLMConnection(config: LLMConfig): Promise<{ success: b
 }
 
 export async function listModels(config: Pick<LLMConfig, 'provider' | 'api_key' | 'base_url'>): Promise<string[]> {
+  if (config.provider === 'xai') {
+    // xAI has no list models API — return known models
+    return [
+      'grok-4',
+      'grok-4-0709',
+      'grok-4.20-0309-reasoning',
+      'grok-4-1-fast-reasoning',
+      'grok-4.20-multi-agent-0309',
+      'grok-4.20-0309-non-reasoning',
+      'grok-4-1-fast-non-reasoning',
+    ]
+  }
+
   if (config.provider === 'openai_compatible' || config.provider === 'openai') {
     const { default: OpenAI } = await import('openai')
     const client = new OpenAI({
       apiKey: config.api_key,
       ...(config.base_url && { baseURL: config.base_url }),
+      httpAgent: getProxyAgent(),
     })
     const list = await client.models.list()
     const models: string[] = []

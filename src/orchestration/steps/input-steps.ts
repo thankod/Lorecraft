@@ -8,6 +8,7 @@ import type {
 } from '../../domain/models/pipeline-io.js'
 import { ParsedIntentSchema } from '../../domain/models/pipeline-io.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
+import { prompts } from '../../ai/prompt/prompts.js'
 
 // ============================================================
 // Step 1: ValidationStep — basic input validation (pure code)
@@ -63,24 +64,7 @@ export class InputParserStep implements IPipelineStep<string, ParsedIntent> {
   }
 
   async execute(input: string, context: PipelineContext): Promise<StepResult<ParsedIntent>> {
-    const systemPrompt = [
-      'You are the InputParser agent for a CRPG engine.',
-      'Given the player\'s raw input and game context, extract the structured intent.',
-      'Extract the player\'s intent as a single compound action. The action type is an UPPER_SNAKE_CASE verb describing the primary action (e.g. MOVE_TO, SPEAK_TO, EXAMINE, SEARCH, HIDE, ATTACK, PICK_UP, USE, OBSERVE, DODGE, FLEE — use whatever fits best). If the player describes multiple actions in one input, merge them into ONE action whose "method" field describes the full sequence.',
-      '',
-      'NARRATIVE AUTHORITY RULE:',
-      'The player can ONLY control their own character\'s actions. They CANNOT dictate world events.',
-      'If the player input contains world assertions — things that control the world rather than the player character (e.g. "突然看到了某人", "天空下起雨", "NPC走过来", "发现了一把剑") — extract them into the "world_assertions" array as short descriptions, and EXCLUDE them from intent/atomic_actions.',
-      'Only the player character\'s own actions (go somewhere, say something, pick up, attack, examine, etc.) belong in atomic_actions.',
-      'Examples:',
-      '  "去小卖部买水" → action: MOVE_TO 小卖部, world_assertions: []',
-      '  "去小卖部，突然看到了苏小玲" → action: MOVE_TO 小卖部, world_assertions: ["苏小玲出现在小卖部"]',
-      '  "打开门，发现房间里有一具尸体" → action: OPEN 门, world_assertions: ["房间里有尸体"]',
-      '',
-      'Respond with ONLY valid JSON matching the ParsedIntent schema:',
-      '{ "intent": string, "tone_signals": Record<string,number>, "atomic_actions": [{ "type": string, "target": string|null, "method": string|null, "order": 0 }], "ambiguity_flags": string[], "world_assertions": string[] }',
-      'IMPORTANT: Always output exactly ONE atomic action with order=0.',
-    ].join('\n')
+    const systemPrompt = prompts.get('input_parser')
 
     const recentContext = context.data.get('recent_context') as {
       recent_narrative?: string[]
@@ -154,12 +138,7 @@ export class AmbiguityResolverStep implements IPipelineStep<ParsedIntent, Parsed
       return { status: 'continue', data: input }
     }
 
-    const systemPrompt = [
-      'You are the AmbiguityResolver agent for a CRPG engine.',
-      'Resolve ambiguous atomic actions by clarifying the method.',
-      'For each ambiguity flag, return a resolved_method and confidence.',
-      'Respond with ONLY valid JSON: { "resolutions": [{ "index": number, "resolved_method": string, "confidence": number }] }',
-    ].join('\n')
+    const systemPrompt = prompts.get('ambiguity_resolver')
 
     const userMessage = JSON.stringify({
       atomic_actions: input.atomic_actions,

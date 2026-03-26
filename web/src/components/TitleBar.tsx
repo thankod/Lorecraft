@@ -42,9 +42,8 @@ export function TitleBar() {
     setMenuOpen(false)
   }
 
-  function handleSettings() {
-    send({ type: 'get_llm_config' })
-    useGameStore.getState().setSettingsOpen(true)
+  function handleNewGame() {
+    send({ type: 'new_game' })
     setMenuOpen(false)
   }
 
@@ -56,20 +55,20 @@ export function TitleBar() {
           <button
             className="settings-btn"
             onClick={() => { setMenuOpen(!menuOpen); setConfirmReset(false) }}
-            title="设置"
+            title="菜单"
           >
             &#9881;
           </button>
           {menuOpen && (
             <div className="settings-menu">
+              <button className="menu-item" onClick={handleNewGame}>
+                新游戏
+              </button>
               <button className="menu-item" onClick={handleSave}>
                 存档
               </button>
               <button className="menu-item" onClick={handleSessions}>
                 存档管理
-              </button>
-              <button className="menu-item" onClick={handleSettings}>
-                设置
               </button>
               <button className="menu-item danger" onClick={handleReset}>
                 {confirmReset ? '确认重置？' : '重置游戏'}

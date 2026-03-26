@@ -11,6 +11,7 @@ import type { PlayerAttributes } from '../../domain/models/attributes.js'
 import { ATTRIBUTE_IDS, ATTRIBUTE_META } from '../../domain/models/attributes.js'
 import { ArbitrationReportSchema } from '../../domain/models/pipeline-io.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
+import { prompts } from '../../ai/prompt/prompts.js'
 
 // ============================================================
 // Step 0: ParallelQueryStep — fetch memory + world state + lore
@@ -66,27 +67,7 @@ export class FeasibilityCheckStep implements IPipelineStep<AtomicAction, AtomicA
     const loreEntries = context.data.get('lore_entries')
     const recentEvents = context.data.get('recent_events')
 
-    const systemPrompt = [
-      'You are the FeasibilityJudge for a CRPG engine.',
-      'Given an action and the current game context, determine whether the action is PHYSICALLY AND LOGICALLY POSSIBLE — nothing more.',
-      '',
-      'CORE PRINCIPLE: This is a free-form CRPG. Players may roleplay ANY personality — reckless, rude, absurd, villainous, comedic. The FeasibilityJudge must NEVER reject an action because it is socially inappropriate, unwise, offensive, or out of place. Those choices are the player\'s right; consequences are handled by the world simulation, not by blocking the action.',
-      '',
-      'Assess these dimensions:',
-      '',
-      '1. **Information completeness**: Does the character subjectively possess the information needed to perform this action? (The player knowing something does NOT mean the character knows it.) CRITICAL EXCEPTION: Bluffing, lying, making false accusations, guessing, and fabricating information are ALWAYS feasible — the character is deliberately making things up, which does NOT require actually possessing the information. Only reject if the action genuinely requires factual knowledge the character does not have AND the action is NOT a deliberate deception or provocation.',
-      '2. **Physical/spatial feasibility**: Is the action physically possible given the character\'s current body, location, and equipment? IMPORTANT: Items or objects not explicitly mentioned in the scene should be considered present if they are reasonable for the current environment (e.g. a tavern has tables, cups, a door; a forest has trees, rocks, bushes). Only reject if the object is clearly impossible in context.',
-      '3. **Logical consistency**: Would the action create a factual contradiction with established world state? (e.g. talking to a character who is dead, using an item already consumed.) Note: saying something false or unverified is NOT a logical contradiction — the character is speaking, not rewriting reality.',
-      '4. **Narrative drift**: Would this action cause the story to significantly derail from the main narrative arc? (This dimension NEVER causes rejection — it only flags drift.)',
-      '',
-      'ONLY reject (passed=false) if dimension 1, 2, or 3 fails. Socially awkward, rude, absurd, deceptive, or "unwise" actions MUST pass — the world will react accordingly. Bluffs and lies should PASS feasibility and let the world simulation handle NPC reactions (belief, anger, confusion, etc.).',
-      '',
-      'If any of dimensions 1-3 fails, generate a short, in-character rejection narrative that feels natural within the game world — never expose system language to the player.',
-      'If all dimensions 1-3 pass, the overall result is passed. rejection_narrative should be null.',
-      '',
-      'Respond with ONLY valid JSON:',
-      '{ "passed": boolean, "checks": [{ "dimension": string, "passed": boolean, "reason": string|null }], "drift_flag": boolean, "rejection_narrative": string|null }',
-    ].join('\n')
+    const systemPrompt = prompts.get('feasibility_judge')
 
     const userMessage = JSON.stringify({
       action: input,
@@ -222,47 +203,9 @@ export class AttributeCheckStep implements IPipelineStep<AtomicAction, AtomicAct
 
     const attrList = ATTRIBUTE_IDS.map((id) => `${ATTRIBUTE_META[id].display_name}(${id}): ${attrs[id]} — ${ATTRIBUTE_META[id].domain}`).join('\n')
 
-    const systemPrompt = [
-      'You are the DM (Dungeon Master) for a CRPG engine.',
-      'Decide if the player\'s action requires an attribute check (skill check).',
-      '',
-      'WHEN TO REQUIRE A CHECK:',
-      '- Actions with uncertain outcomes that depend on character ability',
-      '- Physical challenges: climbing, fighting, dodging, chasing, sneaking',
-      '- Mental challenges: deciphering, recalling knowledge, resisting pressure',
-      '- Social challenges: persuading, deceiving, intimidating',
-      '- Perception: spotting hidden details, reading body language, noticing danger',
-      '',
-      'WHEN NOT TO REQUIRE A CHECK:',
-      '- Trivial actions anyone could do (walking, talking normally, looking around casually)',
-      '- Pure narrative/roleplaying choices with no skill dependency',
-      '- Actions already blocked by feasibility (physically impossible)',
-      '',
-      'DIFFICULTY LEVELS (choose ONE):',
-      '- TRIVIAL: Almost anyone can do this, only the weakest might fail (e.g. pushing open an unlocked door, basic small talk)',
-      '- ROUTINE: Needs some ability, average person succeeds more often than not (e.g. climbing a low fence, persuading a friendly NPC, spotting something partially hidden)',
-      '- HARD: Genuine challenge requiring strong ability in this area (e.g. picking a good lock, deceiving a suspicious guard, hitting a moving target)',
-      '- VERY_HARD: Even experts need luck (e.g. disarming a master trap, intimidating a fearless veteran, sprinting across a collapsing bridge)',
-      '- LEGENDARY: Near impossible, only the absolute best have a slim chance (e.g. outrunning a horse, persuading a sworn enemy to surrender, catching an arrow mid-flight)',
-      '',
-      `Player attributes:\n${attrList}`,
-      '',
-      'DIFFICULTY has two parts:',
-      '1. BASE DIFFICULTY — the inherent difficulty of the action itself (one of the 5 levels above).',
-      '2. MODIFIERS — situational factors that raise or lower the final target number. Each modifier has a short label and a numeric value (positive = harder, negative = easier). Typical modifier range: -20 to +20 per factor.',
-      '',
-      'MODIFIER GUIDELINES (apply all that are relevant, omit those that don\'t apply):',
-      '- NPC attitude/emotional state: friendly NPC → -10~-15; hostile/angry NPC → +10~+20; neutral → 0 (omit)',
-      '- Environmental conditions: favorable (darkness for stealth, quiet room for focus) → -5~-15; unfavorable (bright light for stealth, noisy for persuasion) → +5~+15',
-      '- Prior preparation: player scouted, gathered info, or set up for this → -10~-20',
-      '- Repeated attempt: retrying a just-failed action → +10~+15 (target is alert/window closing)',
-      '- Pressure/stakes: life-threatening or irreversible situation → +5~+10',
-      '- Tool/resource advantage: player has a relevant tool or item → -5~-15',
-      '',
-      'Choose the MOST relevant single attribute for the check.',
-      'IMPORTANT: Do NOT look at the player\'s attribute values when deciding difficulty. Difficulty is determined by the action and situation — not by how good the player is at it.',
-      'Respond with ONLY valid JSON: { "needs_check": boolean, "attribute": "attribute_id"|null, "difficulty": "TRIVIAL"|"ROUTINE"|"HARD"|"VERY_HARD"|"LEGENDARY"|null, "modifiers": [{ "label": "short reason", "value": number }]|null, "reason": string|null }',
-    ].join('\n')
+    const systemPrompt = prompts.fill('check_dm', {
+      attribute_list: `Player attributes:\n${attrList}`,
+    })
 
     const userMessage = JSON.stringify({
       action: input,

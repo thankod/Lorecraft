@@ -106,12 +106,21 @@ interface StepTokens {
   llm_calls: number
 }
 
+interface LLMCallInfo {
+  agent_type: string
+  duration_ms: number
+  usage?: { input_tokens: number; output_tokens: number }
+  messages: Array<{ role: string; content: string }>
+  response: string
+}
+
 interface GroupedStep {
   name: string
   status: string
   duration_ms?: number
   data?: string
   tokens?: StepTokens
+  llmCalls?: LLMCallInfo[]
   running: boolean
 }
 
@@ -132,12 +141,15 @@ function groupSteps(entries: DebugStepEntry[]): GroupedStep[] {
           g.status = e.status ?? 'continue'
           g.duration_ms = e.duration_ms
           g.data = e.data
-          // Extract token info from data JSON
+          // Extract token info and LLM call details from data JSON
           if (e.data) {
             try {
               const parsed = JSON.parse(e.data)
               if (parsed.tokens) {
                 g.tokens = parsed.tokens as StepTokens
+              }
+              if (parsed.llm_calls && Array.isArray(parsed.llm_calls)) {
+                g.llmCalls = parsed.llm_calls as LLMCallInfo[]
               }
             } catch { /* ignore */ }
           }
@@ -154,6 +166,7 @@ function groupSteps(entries: DebugStepEntry[]): GroupedStep[] {
 function StepNode({ step }: { step: GroupedStep }) {
   const [expanded, setExpanded] = useState(false)
   const hasData = !!step.data
+  const hasLLM = step.llmCalls && step.llmCalls.length > 0
 
   const statusCls = step.running
     ? 'running'
@@ -165,7 +178,7 @@ function StepNode({ step }: { step: GroupedStep }) {
 
   return (
     <div className="debug-step">
-      <div className="debug-step-header" onClick={() => hasData && setExpanded(!expanded)}>
+      <div className="debug-step-header" onClick={() => (hasData || hasLLM) && setExpanded(!expanded)}>
         <span className={`debug-status-dot ${statusCls}`} />
         <span className="debug-step-name">{step.name}</span>
         {step.duration_ms != null && (
@@ -176,16 +189,96 @@ function StepNode({ step }: { step: GroupedStep }) {
             in:{step.tokens.input_tokens} out:{step.tokens.output_tokens}
           </span>
         )}
+        {hasLLM && <span className="debug-step-tag llm">LLM x{step.llmCalls!.length}</span>}
         {step.running && <span className="debug-step-spinner">⟳</span>}
         {step.status === 'short_circuit' && <span className="debug-step-tag sc">短路</span>}
         {step.status === 'error' && <span className="debug-step-tag err">错误</span>}
-        {hasData && <span className="debug-expand-hint">{expanded ? '收起' : '展开'}</span>}
+        {(hasData || hasLLM) && <span className="debug-expand-hint">{expanded ? '收起' : '展开'}</span>}
       </div>
-      {expanded && step.data && (
-        <pre className="debug-step-data">{step.data}</pre>
+      {expanded && (
+        <div className="debug-step-body">
+          {hasLLM && step.llmCalls!.map((call, i) => (
+            <LLMCallCard key={i} call={call} index={i} />
+          ))}
+          {step.data && <pre className="debug-step-data">{formatStepData(step.data)}</pre>}
+        </div>
       )}
     </div>
   )
+}
+
+/** Format step data for display, hiding llm_calls (shown as cards instead) */
+function formatStepData(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw)
+    // Remove llm_calls from the display since we show them as cards
+    if (parsed.llm_calls) {
+      const { llm_calls: _, ...rest } = parsed
+      if (Object.keys(rest).length === 0) return ''
+      return JSON.stringify(rest, null, 2)
+    }
+    return raw
+  } catch {
+    return raw
+  }
+}
+
+function LLMCallCard({ call, index }: { call: LLMCallInfo; index: number }) {
+  const [showInput, setShowInput] = useState(false)
+  const [showOutput, setShowOutput] = useState(false)
+
+  return (
+    <div className="llm-call-card">
+      <div className="llm-call-header">
+        <span className="llm-call-badge">LLM #{index + 1}</span>
+        <span className="llm-call-agent">{call.agent_type}</span>
+        <span className="llm-call-time">{call.duration_ms}ms</span>
+        {call.usage && (
+          <span className="llm-call-usage">
+            in:{call.usage.input_tokens} out:{call.usage.output_tokens}
+          </span>
+        )}
+      </div>
+      <div className="llm-call-actions">
+        <button
+          className={`llm-call-toggle ${showInput ? 'active' : ''}`}
+          onClick={() => setShowInput(!showInput)}
+        >
+          输入 ({call.messages.length} 条消息)
+        </button>
+        <button
+          className={`llm-call-toggle ${showOutput ? 'active' : ''}`}
+          onClick={() => setShowOutput(!showOutput)}
+        >
+          输出
+        </button>
+      </div>
+      {showInput && (
+        <div className="llm-call-messages">
+          {call.messages.map((msg, i) => (
+            <div key={i} className={`llm-msg llm-msg-${msg.role}`}>
+              <div className="llm-msg-role">{msg.role}</div>
+              <pre className="llm-msg-content">{msg.content}</pre>
+            </div>
+          ))}
+        </div>
+      )}
+      {showOutput && (
+        <div className="llm-call-response">
+          <pre className="llm-msg-content">{formatLLMResponse(call.response)}</pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function formatLLMResponse(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw)
+    return JSON.stringify(parsed, null, 2)
+  } catch {
+    return raw
+  }
 }
 
 function StateBlock({ states }: { states: Record<string, unknown> }) {

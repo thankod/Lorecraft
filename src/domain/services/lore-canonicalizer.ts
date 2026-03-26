@@ -1,5 +1,6 @@
 import type { AgentRunner } from '../../ai/runner/agent-runner.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
+import { prompts } from '../../ai/prompt/prompts.js'
 import type { ILoreStore, IStateStore } from '../../infrastructure/storage/interfaces.js'
 import type { LoreEntry, NPCProfile } from '../../domain/models/lore.js'
 import { z } from 'zod/v4'
@@ -46,12 +47,7 @@ export class LoreCanonicalizer {
   }
 
   async extractFacts(narrativeText: string, eventId: string): Promise<ExtractedFact[]> {
-    const systemPrompt = [
-      'You are the FactExtractor for a CRPG lore system.',
-      'Extract concrete facts from the narrative text.',
-      'Only extract NEW information (names, relationships, locations, etc), not descriptions of actions.',
-      'Respond with ONLY valid JSON: { "facts": [{ "content": string, "fact_type": "NPC_PERSONAL"|"WORLD"|"RELATIONSHIP"|"ORGANIZATION", "subject_ids": string[], "confidence": 0-1 }] }',
-    ].join('\n')
+    const systemPrompt = prompts.get('fact_extractor')
 
     const userMessage = JSON.stringify({
       narrative_text: narrativeText,
@@ -85,12 +81,7 @@ export class LoreCanonicalizer {
       return { verdict: 'SUPPLEMENTARY', reasoning: 'No existing lore to compare' }
     }
 
-    const systemPrompt = [
-      'You are the LoreConsistencyChecker.',
-      'Compare a new fact against existing lore entries.',
-      'Determine if the new fact is consistent, supplementary (adds new info), or contradictory.',
-      'Respond with ONLY valid JSON: { "verdict": "CONSISTENT"|"SUPPLEMENTARY"|"CONTRADICTORY", "reasoning": string }',
-    ].join('\n')
+    const systemPrompt = prompts.get('lore_consistency_checker')
 
     const userMessage = JSON.stringify({
       new_fact: fact.content,

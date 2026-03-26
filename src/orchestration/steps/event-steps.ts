@@ -10,6 +10,7 @@ import type { Event } from '../../domain/models/event.js'
 import type { SignalProcessor } from '../../domain/services/signal-processor.js'
 import { EventGeneratorOutputSchema, SignalBOutputSchema, PacingCheckOutputSchema } from '../../domain/models/pipeline-io.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
+import { prompts } from '../../ai/prompt/prompts.js'
 import { z } from 'zod/v4'
 
 // ============================================================
@@ -109,17 +110,7 @@ export class PacingCheckStep implements IPipelineStep<ArbitrationResult, Arbitra
     input: ArbitrationResult,
     context: PipelineContext,
   ): Promise<StepResult<ArbitrationResult>> {
-    const systemPrompt = [
-      'You are a narrative pacing judge for a CRPG engine.',
-      'Given an action and recent context, decide if this moment calls for QUICK interaction or NARRATIVE expansion.',
-      '',
-      'QUICK: routine actions, simple dialogue, movement, repeated actions, checking inventory, etc. Max 100 characters.',
-      'NARRATIVE: dramatic moments, first encounters, combat, discoveries, emotional scenes, plot-advancing events. No character limit.',
-      '',
-      'Respond with ONLY valid JSON:',
-      '{ "pacing": "QUICK"|"NARRATIVE", "max_chars": number|null, "reasoning": string }',
-      'For QUICK, set max_chars to 100. For NARRATIVE, set max_chars to null.',
-    ].join('\n')
+    const systemPrompt = prompts.get('pacing_judge')
 
     const recentNarrative = context.data.get('recent_context') as {
       recent_narrative?: string[]
@@ -232,32 +223,14 @@ export class EventGeneratorStep
       beatInstruction = `CURRENT SCENE BEAT: "${currentBeat.description}" (purpose: ${currentBeat.purpose}). Try to incorporate this beat naturally into the scene. If the player's action makes this beat impossible, adapt — but still aim to advance the story rather than spinning in place.`
     }
 
-    const systemPrompt = [
-      'You are the EventGenerator agent for a CRPG engine.',
-      'Generate a complete event from the given action and context.',
-      toneInstruction,
-      tensionInstruction,
-      narrativeDirectionInstruction,
-      beatInstruction,
-      'IMPORTANT: The player has full freedom to roleplay ANY personality. If the action is socially reckless, rude, absurd, or provocative, DO NOT soften or redirect it — faithfully execute the action and let the WORLD react with realistic consequences (NPCs get angry, guard intervene, allies lose trust, opportunities close, etc.). The player chose this; honor their agency.',
-      'CRITICAL — NARRATIVE CONTINUITY: You MUST read the recent_narrative carefully. NPCs remember what just happened. If the player attacked or insulted an NPC in a previous turn, that NPC will NOT suddenly act friendly or ignore the conflict. NPC emotional states, injuries, hostilities, and relationship changes from recent events MUST carry forward. Breaking continuity is the worst possible error.',
-      'ATTRIBUTE CHECK: If an attribute_check is provided, the narrative MUST reflect its outcome. If passed, the character succeeds at the skill-dependent part. If failed, the character fails or only partially succeeds — describe the failure naturally without breaking immersion.',
-      'PLAYER WISH: If player_wish is provided, it represents things the player HOPED would happen (e.g. encountering a specific NPC). You are NOT obligated to honor these wishes. Only incorporate them if they make narrative sense given the current context, location, and NPC states. If they don\'t make sense, simply ignore them — the world follows its own logic.',
-      'DECISION POINT: The narrative MUST end at a moment that invites the player\'s next decision. This does NOT always mean a cliffhanger or crisis. A decision point can be: an NPC asking a casual question, choosing where to go next, deciding how to spend free time, a conversation fork, or simply a new situation that has multiple interesting responses. Match the decision point to the current tension level — not every scene needs life-or-death urgency.',
-      'FORMATTING RULES for narrative_text:',
-      '- Separate paragraphs with \\n\\n (double newline). NEVER write a wall of text.',
-      '- Each paragraph should focus on one beat: a description, an action, or a dialogue line.',
-      '- NPC dialogue MUST be wrapped in 「」 (e.g. 「这么晚了，还在收拾？」). Each dialogue line should be its own paragraph.',
-      '- Sound effects or environmental sounds use 『』 (e.g. 『滋——滋滋——』). Each sound should be its own paragraph.',
-      '- Player character actions and scene descriptions are plain text paragraphs.',
-      '- Keep paragraphs short — 1-3 sentences max. Dense prose kills readability.',
-      forceInstruction,
-      pacingInstruction,
-      'CHARACTER OBSERVATIONS: For every NPC who appears in this scene, include a character_observations entry describing what the PLAYER CHARACTER can observe about them RIGHT NOW — appearance, demeanor, tone of voice, body language, visible emotions. Do NOT include backstory, secrets, or information the player couldn\'t perceive. Write from the player character\'s perspective.',
-      'Respond with ONLY valid JSON: { "title": string, "tags": string[], "weight": "PRIVATE"|"MINOR"|"SIGNIFICANT"|"MAJOR", "summary": string, "context": string, "narrative_text": string, "state_changes": [{ "target": string, "field": string, "change_description": string }], "character_observations": [{ "npc_name": string, "observation": string, "relationship_hint": string (optional, only if relationship change is apparent) }] }',
-    ]
-      .filter(Boolean)
-      .join('\n')
+    const systemPrompt = prompts.fill('event_generator', {
+      tone_instruction: toneInstruction,
+      tension_instruction: tensionInstruction,
+      narrative_direction_instruction: narrativeDirectionInstruction,
+      beat_instruction: beatInstruction,
+      force_instruction: forceInstruction,
+      pacing_instruction: pacingInstruction,
+    })
 
     // Include attribute check result so narrative reflects pass/fail
     const checkDesc = context.data.get('check_description') as string | undefined
@@ -536,11 +509,50 @@ export class StateWritebackStep implements IPipelineStep<EventPipelineData, Even
       `当前场景：${gen.narrative_text}`,
     ].join('\n'))
 
+    // Apply player location changes from state_changes
+    await this.applyLocationChanges(gen, context)
+
     // Update player's CharacterKnowledge from state_changes + character_observations
     await this.updateCharacterKnowledge(gen, context)
 
     return { status: 'continue', data: input }
   }
+  private async applyLocationChanges(
+    gen: EventGeneratorOutput,
+    context: PipelineContext,
+  ): Promise<void> {
+    const playerId = context.player_character_id
+
+    for (const sc of gen.state_changes) {
+      const fieldLower = sc.field.toLowerCase()
+      const isLocationField = fieldLower === 'location' || fieldLower.includes('位置')
+
+      // Match player location changes: target can be the player id, "player", "Player", etc.
+      const targetLower = sc.target.toLowerCase()
+      const isPlayerTarget = targetLower === playerId.toLowerCase()
+        || targetLower === 'player'
+        || targetLower.startsWith('player')
+        || sc.target === playerId
+
+      if (isLocationField && isPlayerTarget) {
+        // Write to the key that game-loop.ts reads
+        await this.stateStore.set(`character:location:${playerId}`, sc.change_description)
+
+        // Also update the objective world state location
+        const prevObjective = await this.stateStore.get<{
+          current_location: string
+          scene_description: string
+          present_npcs: string[]
+        }>(`world:objective:${playerId}`)
+
+        if (prevObjective) {
+          prevObjective.current_location = sc.change_description
+          await this.stateStore.set(`world:objective:${playerId}`, prevObjective)
+        }
+      }
+    }
+  }
+
   private async updateCharacterKnowledge(
     gen: EventGeneratorOutput,
     context: PipelineContext,
@@ -685,11 +697,7 @@ export class SignalBStep implements IPipelineStep<EventPipelineData, EventPipeli
       return { status: 'continue', data: input }
     }
 
-    const systemPrompt = [
-      'You are the SignalBTagger agent for a CRPG engine.',
-      'Analyze the event and tag choice signals that reflect the player\'s character tendencies.',
-      'Respond with ONLY valid JSON: { "choice_signals": { "trait_id": weight_delta } }',
-    ].join('\n')
+    const systemPrompt = prompts.get('signal_b_tagger')
 
     const userMessage = JSON.stringify({
       event_summary: input.generator_output.summary,
@@ -769,19 +777,7 @@ export class NarrativeProgressStep implements IPipelineStep<EventPipelineData, E
     // Ask LLM: is the current phase complete? Generate new beats if needed.
     const gen = input.generator_output
 
-    const systemPrompt = [
-      'You are a narrative progress assessor for a CRPG engine.',
-      'Given the current narrative phase and the latest event, determine:',
-      '1. Whether the current phase\'s goals have been met (phase_complete: true/false)',
-      '2. If a new beat plan is needed, generate 3-5 short-term scene beats that guide the next few turns toward the phase goal.',
-      '',
-      'A phase is complete when its key dramatic goals have been achieved — NOT just because time has passed.',
-      'Beats are short-term: each describes one scene moment or interaction that moves the story forward.',
-      '',
-      'Respond with ONLY valid JSON:',
-      '{ "phase_complete": boolean, "phase_complete_reasoning": string, "next_beats": [{ "description": string, "purpose": string }] | null }',
-      'Include next_beats only when a new beat plan is needed (current plan exhausted or phase just advanced).',
-    ].join('\n')
+    const systemPrompt = prompts.get('narrative_progress_assessor')
 
     const userMessage = JSON.stringify({
       current_phase: currentPhase,

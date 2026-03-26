@@ -11,6 +11,7 @@ import type { PlayerAttributes } from '../../domain/models/attributes.js'
 import { ATTRIBUTE_IDS, ATTRIBUTE_META } from '../../domain/models/attributes.js'
 import { TraitVoiceOutputSchema, DebateOutputSchema } from '../../domain/models/pipeline-io.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
+import { prompts } from '../../ai/prompt/prompts.js'
 
 // ============================================================
 // Reflection Pipeline intermediate type
@@ -126,35 +127,7 @@ export class VoiceGenerationStep implements IPipelineStep<ParsedIntent, ParsedIn
     const activeVoices = (context.data.get('active_voices') as ActiveVoice[]) ?? []
     const injectedContext = context.data.get('injected_context') as string | null
 
-    const systemPrompt = [
-      'You are the InnerVoiceGenerator for a CRPG engine (Disco Elysium style).',
-      'The player character has 8 attributes, each representing an inner voice personality.',
-      'You decide which voices speak up BEFORE the player acts — anticipatory inner thoughts.',
-      '',
-      'CRITICAL RULE — SELECTIVITY:',
-      '- Most actions trigger 0-1 voices. Occasionally 2 if genuine tension exists.',
-      '- 3+ voices is EXTREMELY rare — only for major story-defining moments.',
-      '- A voice speaks ONLY when the action falls squarely in its domain.',
-      '- Higher attribute value = the voice is stronger, more confident, more opinionated.',
-      '- Lower attribute value (11-30) = the voice is weak, uncertain, sometimes wrong.',
-      '- If no voice has genuine relevance, return an EMPTY voices array. Silence is the default.',
-      '',
-      'VOICE PERSONALITY: Each voice has a distinct personality. Stay in character.',
-      '- The voice ARGUES from its own perspective, with its own bias.',
-      '- High-value voices are assertive and detailed.',
-      '- Low-value voices are hesitant, vague, or self-doubting.',
-      '',
-      'STANCE GUIDELINES:',
-      '- SUPPORT: the voice approves or encourages',
-      '- QUESTION: raises a thought-provoking observation',
-      '- TAUNT: mocks or challenges playfully',
-      '- WARN: ONLY for genuinely dangerous actions (trap, vastly superior enemy). Routine actions NEVER get WARN.',
-      '',
-      'WORLD ASSERTION: If world_assertion_hint is provided, the player tried to control the world (e.g. deciding who appears, what they find). One voice MUST gently remind the player that they can only control their own actions — the world decides the rest. Keep it brief, in-character, and non-breaking (1 sentence). Use the most relevant voice personality for the hint.',
-      'IMPORTANT: trait_id must be the Chinese display_name provided (e.g. "力量", "感知"), NOT the English id.',
-      '',
-      'Respond with ONLY valid JSON: { "voices": [{ "trait_id": string, "line": string, "stance": "WARN"|"SUPPORT"|"QUESTION"|"TAUNT" }], "debate_needed": boolean }',
-    ].join('\n')
+    const systemPrompt = prompts.get('inner_voice_generator')
 
     const worldAssertionHint = context.data.get('world_assertion_hint') as string | null
 
@@ -231,12 +204,7 @@ export class DebateStep implements IPipelineStep<ParsedIntent, ParsedIntent> {
       return { status: 'continue', data: input }
     }
 
-    const systemPrompt = [
-      'You are the DebateGenerator agent for a CRPG engine.',
-      'Generate a brief internal debate between opposing attribute voices.',
-      'Use the Chinese display names for trait_id (e.g. "力量", "智力").',
-      'Respond with ONLY valid JSON: { "debate_lines": [{ "trait_id": string, "line": string }] }',
-    ].join('\n')
+    const systemPrompt = prompts.get('debate_generator')
 
     const userMessage = JSON.stringify({
       voices: traitVoices.voices,

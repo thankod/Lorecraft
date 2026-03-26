@@ -1,7 +1,18 @@
 import OpenAI from 'openai'
+import { HttpsProxyAgent } from 'https-proxy-agent'
 import type { ILLMProvider, LLMMessage, LLMResponse } from './llm-provider.js'
 
 const DEFAULT_MODEL = 'gpt-4o-mini'
+
+function getProxyAgent(): HttpsProxyAgent<string> | undefined {
+  const proxyUrl =
+    process.env.https_proxy ??
+    process.env.HTTPS_PROXY ??
+    process.env.http_proxy ??
+    process.env.HTTP_PROXY ??
+    process.env.ALL_PROXY
+  return proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined
+}
 
 export interface OpenAIProviderOptions {
   apiKey: string
@@ -14,9 +25,10 @@ export class OpenAIProvider implements ILLMProvider {
   private model: string
 
   constructor(options: OpenAIProviderOptions) {
-    this.client = new OpenAI({ 
+    this.client = new OpenAI({
       apiKey: options.apiKey,
-      ...(options.baseURL && { baseURL: options.baseURL })
+      ...(options.baseURL && { baseURL: options.baseURL }),
+      httpAgent: getProxyAgent(),
     })
     this.model = options.model ?? DEFAULT_MODEL
   }

@@ -183,6 +183,14 @@ function handleMessage(msg) {
       resolvePending()
       break
 
+    case 'no_game':
+      // Server has no active game — auto-start a new one for playtest
+      if (state.phase === 'connecting') {
+        log('No active game, starting new game')
+        send({ type: 'new_game' })
+      }
+      break
+
     case 'session_list':
       // If sessions exist and we're not initialized, auto-start new game
       if (state.phase === 'connecting') {

@@ -7,6 +7,7 @@ import { PlayerAttributesSchema } from '../domain/models/attributes.js'
 
 export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('initialize') }),
+  z.object({ type: z.literal('new_game') }),
   z.object({ type: z.literal('input'), text: z.string().min(1) }),
   z.object({ type: z.literal('save') }),
   z.object({ type: z.literal('ping') }),
@@ -34,21 +35,21 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('get_llm_config') }),
   z.object({
     type: z.literal('set_llm_config'),
-    provider: z.enum(['openai_compatible', 'gemini', 'openai', 'anthropic']),
+    provider: z.enum(['openai_compatible', 'gemini', 'openai', 'anthropic', 'xai']),
     api_key: z.string().min(1),
     model: z.string(),
     base_url: z.string().optional(),
   }),
   z.object({
     type: z.literal('test_llm_config'),
-    provider: z.enum(['openai_compatible', 'gemini', 'openai', 'anthropic']),
+    provider: z.enum(['openai_compatible', 'gemini', 'openai', 'anthropic', 'xai']),
     api_key: z.string().min(1),
     model: z.string(),
     base_url: z.string().optional(),
   }),
   z.object({
     type: z.literal('list_models'),
-    provider: z.enum(['openai_compatible', 'gemini', 'openai', 'anthropic']),
+    provider: z.enum(['openai_compatible', 'gemini', 'openai', 'anthropic', 'xai']),
     api_key: z.string().min(1),
     base_url: z.string().optional(),
   }),
@@ -85,6 +86,7 @@ export type ServerMessage =
   | { type: 'llm_config_saved' }
   | { type: 'llm_test_result'; success: boolean; message: string }
   | { type: 'model_list'; models: string[] }
+  | { type: 'no_game' }
 
 export interface CharacterInfo {
   id: string

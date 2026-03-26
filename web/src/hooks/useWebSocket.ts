@@ -282,6 +282,11 @@ export function useWebSocket() {
           s.setLLMModels(msg.models)
           break
 
+        case 'no_game':
+          s.appendNarrative('当前没有进行中的游戏。', 'system')
+          s.appendNarrative('请在右上角菜单中选择「新游戏」来开始冒险。', 'system')
+          break
+
         case 'reset_complete':
           s.resetGame()
           s.appendNarrative('游戏已重置。', 'system')

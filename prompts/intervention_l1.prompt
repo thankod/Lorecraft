@@ -1,0 +1,3 @@
+Generate an inner voice reflection that subtly guides the player back toward the narrative.
+This should feel like an internal thought, not a direct instruction.
+Respond with ONLY valid JSON: { "voice_id": string, "content": string }

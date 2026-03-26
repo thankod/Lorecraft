@@ -1,5 +1,6 @@
 import type { AgentRunner } from '../../ai/runner/agent-runner.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
+import { prompts } from '../../ai/prompt/prompts.js'
 import type {
   IStateStore,
   IEventStore,
@@ -107,104 +108,74 @@ export class InitializationAgent {
   ): Promise<GenesisDocument> {
     let lastError = ''
 
-    const schemaHint = `
-STRICT JSON SCHEMA (follow EXACTLY):
-{
-  "world_setting": {
-    "background": "string - world background description",
-    "tone": "string - narrative tone",
-    "core_conflict": "string - central conflict",
-    "hidden_secrets": ["string array - secrets hidden from player"],
-    "factions": [{
-      "id": "string",
-      "name": "string",
-      "description": "string",
-      "initial_strength": "WEAK" | "MODERATE" | "STRONG" | "DOMINANT",
-      "initial_resources": "string",
-      "initial_relationships": {
-        "other_faction_id": {
-          "relation_type": "ALLIED" | "NEUTRAL" | "HOSTILE" | "UNKNOWN",
-          "description": "string"
-        }
-      }
-    }]
-  },
-  "narrative_structure": {
-    "final_goal_description": "string",
-    "inciting_event": {
-      "title": "string",
-      "description": "string",
-      "location_id": "string - must match a location id",
-      "participant_ids": ["string array - character ids involved"],
-      "narrative_text": "string - the opening narrative text"
-    },
-    "phases": [{
-      "phase_id": "string",
-      "description": "string",
-      "direction_summary": "string - REQUIRED"
-    }]
-  },
-  "characters": {
-    "player_character": { "id": "string", "name": "string", "background": "string" },
-    "tier_a_npcs": [{
-      "id": "string",
-      "name": "string",
-      "background": "string",
-      "surface_motivation": "string",
-      "deep_motivation": "string",
-      "secrets": ["string array"],
-      "initial_relationships": { "other_npc_id": "string description" }
-    }],
-    "tier_b_npcs": [{
-      "id": "string",
-      "name": "string",
-      "background": "string",
-      "role_description": "string"
-    }]
-  },
-  "initial_locations": [{
-    "id": "string",
-    "name": "string",
-    "region_id": "string",
-    "description": "string",
-    "initial_status": "string",
-    "connections": [{
-      "to_location_id": "string",
-      "traversal_condition": "OPEN" | "REQUIRES_KEY" | "REQUIRES_EVENT" | "BLOCKED",
-      "condition_detail": "string or null",
-      "travel_time_turns": number
-    }]
-  }]
-}
-
-CRITICAL RULES:
-- Do NOT include "id" or "created_at" at the top level (they will be auto-generated)
-- Enum values MUST be UPPERCASE: "WEAK"/"MODERATE"/"STRONG"/"DOMINANT", "ALLIED"/"NEUTRAL"/"HOSTILE"/"UNKNOWN", "OPEN"/"REQUIRES_KEY"/"REQUIRES_EVENT"/"BLOCKED"
-- tier_a_npcs: 3-7 NPCs, each must have initial_relationships referencing other NPC ids
-- If NPC A references NPC B, NPC B MUST reference NPC A back
-- phases: at least 3, each MUST have direction_summary
-- initial_locations: at least 3, with connections between them
-- inciting_event.location_id must be one of the location ids
-- All content in Chinese (中文)
-`
+    const schemaHint = [
+      'JSON SCHEMA（严格遵守）:',
+      '{',
+      '  "world_setting": {',
+      '    "background": "string - 世界背景概述（仅限玩家可知的公共信息，禁止透露 hidden_secrets 的内容）",',
+      '    "tone": "string - 叙事基调",',
+      '    "core_conflict": "string - 核心冲突（GM层面，玩家不直接看到）",',
+      '    "hidden_secrets": ["string array - 隐藏真相，玩家需通过游玩发现"],',
+      '    "factions": [{ "id": "string", "name": "string", "description": "string",',
+      '      "initial_strength": "WEAK"|"MODERATE"|"STRONG"|"DOMINANT",',
+      '      "initial_resources": "string",',
+      '      "initial_relationships": { "other_faction_id": { "relation_type": "ALLIED"|"NEUTRAL"|"HOSTILE"|"UNKNOWN", "description": "string" } }',
+      '    }]',
+      '  },',
+      '  "narrative_structure": {',
+      '    "final_goal_description": "string - 最终目标（GM层面）",',
+      '    "inciting_event": {',
+      '      "title": "string",',
+      '      "description": "string - GM层面的事件描述",',
+      '      "location_id": "string - 必须匹配某个地点id",',
+      '      "participant_ids": ["string array - 在场的角色id"],',
+      '      "narrative_text": "string - 玩家看到的开场叙事（100-200字，遵守序幕写作规范）"',
+      '    },',
+      '    "phases": [{ "phase_id": "string", "description": "string", "direction_summary": "string - 必填" }]',
+      '  },',
+      '  "characters": {',
+      '    "player_character": { "id": "string", "name": "string", "background": "string - 仅写角色自己知道的事" },',
+      '    "tier_a_npcs": [{ "id": "string", "name": "string", "background": "string",',
+      '      "surface_motivation": "string - 表面动机（玩家可观察到的）",',
+      '      "deep_motivation": "string - 深层动机（需要深入了解才能发现）",',
+      '      "secrets": ["string array - 隐藏秘密"],',
+      '      "initial_relationships": { "other_npc_id": "string description" }',
+      '    }],',
+      '    "tier_b_npcs": [{ "id": "string", "name": "string", "background": "string", "role_description": "string" }]',
+      '  },',
+      '  "initial_locations": [{ "id": "string", "name": "string", "region_id": "string",',
+      '    "description": "string", "initial_status": "string",',
+      '    "connections": [{ "to_location_id": "string",',
+      '      "traversal_condition": "OPEN"|"REQUIRES_KEY"|"REQUIRES_EVENT"|"BLOCKED",',
+      '      "condition_detail": "string or null", "travel_time_turns": number }]',
+      '  }]',
+      '}',
+      '',
+      '关键规则:',
+      '- 顶层不要包含 "id" 或 "created_at"（自动生成）',
+      '- 枚举值必须大写',
+      '- tier_a_npcs: 3-7个，每个必须有 initial_relationships 引用其他NPC的id',
+      '- 如果 NPC A 引用了 NPC B，NPC B 也必须引用回 NPC A',
+      '- phases: 至少3个，每个必须有 direction_summary',
+      '- initial_locations: 至少3个，彼此有连接关系',
+      '- 至少有一个地点的某条连接为 BLOCKED 或 REQUIRES_EVENT',
+      '- inciting_event.location_id 必须是某个地点的id',
+      '- 所有文本内容使用中文',
+    ].join('\n')
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       this.onProgress(`大模型调用中… (第 ${attempt + 1}/${maxRetries} 次尝试)${lastError ? ` [上次失败: ${lastError.slice(0, 120)}]` : ''}`)
 
-      const systemPrompt = [
-        'You are the WorldGenerator for a CRPG engine (对话式角色扮演游戏).',
-        `Game Style: ${styleConfig.tone}`,
-        `Complexity: ${styleConfig.complexity}`,
-        `Narrative Style: ${styleConfig.narrative_style}`,
-        `Player Archetype: ${styleConfig.player_archetype}`,
-        '',
-        schemaHint,
-        lastError ? `\n上一次尝试失败原因: ${lastError}\n请修正这些问题。` : '',
-        '',
-        'Respond with ONLY valid JSON. No markdown, no explanation, just JSON.',
-      ]
-        .filter(Boolean)
-        .join('\n')
+      const systemPrompt = prompts.fill('world_generator', {
+        style_config: [
+          `基调: ${styleConfig.tone}`,
+          `复杂度: ${styleConfig.complexity}`,
+          `叙事风格: ${styleConfig.narrative_style}`,
+          `角色灵感（仅供参考，不可照搬）: ${styleConfig.player_archetype}`,
+        ].join('\n'),
+        schema_hint: schemaHint,
+        retry_hint: lastError ? `上一次尝试失败原因: ${lastError}\n请修正这些问题。` : '',
+      })
 
       const callStart = Date.now()
       try {

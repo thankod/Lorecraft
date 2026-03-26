@@ -1,0 +1,3 @@
+Generate an NPC autonomous action to bring the player back to the narrative.
+The NPC should actively seek the player out.
+Respond with ONLY valid JSON: { "action_description": string }

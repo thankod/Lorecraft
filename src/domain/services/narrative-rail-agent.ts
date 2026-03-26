@@ -1,5 +1,6 @@
 import type { AgentRunner } from '../../ai/runner/agent-runner.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
+import { prompts } from '../../ai/prompt/prompts.js'
 import type { IEventStore, IStateStore } from '../../infrastructure/storage/interfaces.js'
 import type { NarrativePhase } from '../../domain/models/genesis.js'
 import type { ReflectionInjection, NPCInjection } from '../../domain/models/injection.js'
@@ -76,11 +77,7 @@ export class NarrativeRailAgent {
       effective: boolean | null
     }>('narrative_rail:last_intervention')
 
-    const systemPrompt = [
-      'You are the DriftAssessor for a CRPG narrative rail system.',
-      'Assess how far the current event flow has drifted from the intended narrative phase.',
-      'Respond with ONLY valid JSON: { "drift_level": "NONE"|"MILD"|"MODERATE"|"SEVERE", "needs_intervention": boolean, "suggested_level": 0-3, "reasoning": string }',
-    ].join('\n')
+    const systemPrompt = prompts.get('drift_assessor')
 
     const userMessage = JSON.stringify({
       current_phase: currentPhase,
@@ -184,11 +181,7 @@ export class NarrativeRailAgent {
     currentPhase: NarrativePhase,
     currentTurn: number,
   ): Promise<InterventionResult> {
-    const systemPrompt = [
-      'Generate an inner voice reflection that subtly guides the player back toward the narrative.',
-      'This should feel like an internal thought, not a direct instruction.',
-      'Respond with ONLY valid JSON: { "voice_id": string, "content": string }',
-    ].join('\n')
+    const systemPrompt = prompts.get('intervention_l1')
 
     const userMessage = JSON.stringify({
       phase: currentPhase,
@@ -229,11 +222,7 @@ export class NarrativeRailAgent {
     const npcId = await this.findPhaseNPC(currentPhase)
     if (!npcId) return null
 
-    const systemPrompt = [
-      'Generate a topic for an NPC to steer conversation toward the narrative.',
-      'The topic should feel natural, not forced.',
-      'Respond with ONLY valid JSON: { "context": string, "condition": string }',
-    ].join('\n')
+    const systemPrompt = prompts.get('intervention_l2')
 
     const userMessage = JSON.stringify({
       phase: currentPhase,
@@ -275,11 +264,7 @@ export class NarrativeRailAgent {
     const npcId = await this.findPhaseNPC(currentPhase)
     if (!npcId) return null
 
-    const systemPrompt = [
-      'Generate an NPC autonomous action to bring the player back to the narrative.',
-      'The NPC should actively seek the player out.',
-      'Respond with ONLY valid JSON: { "action_description": string }',
-    ].join('\n')
+    const systemPrompt = prompts.get('intervention_l3')
 
     const userMessage = JSON.stringify({
       phase: currentPhase,
