@@ -8,9 +8,6 @@
   "scripts": {
     "start": "node --import tsx/esm src/main.ts",
     "dev": "node --import tsx/esm --watch src/main.ts",
-    "server": "node --import tsx/esm --watch src/main.ts --server",
-    "client": "node --import tsx/esm src/main.ts --connect ws://localhost:3015",
-    "web": "node --import tsx/esm src/main.ts --web",
     "web:dev": "cd web && pnpm dev",
     "web:build": "cd web && pnpm build",
     "build": "tsup",
@@ -33,7 +30,6 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/blessed": "^0.1.27",
     "@types/node": "^25.5.0",
     "@types/ws": "^8.18.1",
     "tsup": "^8.5.1",
@@ -56,7 +52,6 @@
     "@ai-sdk/xai": "^3.0.74",
     "ai": "^6.0.138",
     "better-sqlite3": "^12.8.0",
-    "blessed": "^0.1.81",
     "dotenv": "^17.3.1",
     "undici": "^7.24.5",
     "ws": "^8.20.0",

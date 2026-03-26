@@ -31,7 +31,7 @@ function getArg(name, fallback) {
   const i = args.indexOf(name)
   return i !== -1 && args[i + 1] ? args[i + 1] : fallback
 }
-const WS_PORT = parseInt(getArg('--ws-port', '3015'))
+const WS_PORT = parseInt(getArg('--ws-port', '3016'))
 const HTTP_PORT = parseInt(getArg('--http-port', '3020'))
 const WS_URL = `ws://localhost:${WS_PORT}`
 

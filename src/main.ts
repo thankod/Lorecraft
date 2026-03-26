@@ -13,7 +13,6 @@ import { loadLLMConfig, detectEnvConfig, createProviderFromConfig } from './serv
 // ============================================================
 
 function loadConfig(): void {
-  // Priority 1: XDG_CONFIG_HOME or ~/.config/lorecraft/.env
   const xdgConfig = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config')
   const globalEnv = join(xdgConfig, 'lorecraft', '.env')
 
@@ -22,14 +21,13 @@ function loadConfig(): void {
     return
   }
 
-  // Priority 2: project root .env (fallback)
   config()
 }
 
 loadConfig()
 
 // ============================================================
-// Proxy Setup: make Node.js fetch respect http_proxy / https_proxy
+// Proxy Setup
 // ============================================================
 
 function setupProxy(): void {
@@ -52,7 +50,6 @@ setupProxy()
 // ============================================================
 
 function createProvider(): ILLMProvider {
-  // Priority 1: Saved UI config (from settings page)
   const savedConfig = loadLLMConfig()
   if (savedConfig && savedConfig.api_key) {
     try {
@@ -64,7 +61,6 @@ function createProvider(): ILLMProvider {
     }
   }
 
-  // Priority 2: Environment variables
   const envConfig = detectEnvConfig()
   if (envConfig) {
     console.log(`[LLM] Using env config: ${envConfig.provider} / ${envConfig.model || 'default'}`)
@@ -109,70 +105,20 @@ function hasFlag(flag: string): boolean {
 async function main(): Promise<void> {
   const debug = hasFlag('--debug')
   const debugPath = debug ? (getArgValue('--debug') ?? './debug.log') : undefined
+  const port = parseInt(getArgValue('--port') ?? process.env.PORT ?? '3016', 10)
 
-  // Database path: --db <path> or default to ~/.local/share/lorecraft/game.db
   const xdgData = process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share')
   const dbPath = getArgValue('--db') ?? join(xdgData, 'lorecraft', 'game.db')
 
-  console.log(`[DB] ${dbPath}`)
-
-  // --server [port]  → start WebSocket server (+ optional web frontend)
-  if (hasFlag('--server')) {
-    const port = parseInt(getArgValue('--server') ?? process.env.PORT ?? '3015', 10)
-    const { GameServer } = await import('./server/game-server.js')
-    const provider = createProvider()
-    const server = new GameServer({ port, provider, debug: debugPath, dbPath })
-    await server.start()
-    console.log(`Lorecraft server listening on ws://localhost:${port}`)
-
-    // --web [port]  → also start web frontend
-    if (hasFlag('--web')) {
-      const webPort = parseInt(getArgValue('--web') ?? '3016', 10)
-      const { WebServer } = await import('./web/web-server.js')
-      const web = new WebServer({ port: webPort, wsPort: port })
-      await web.start()
-      console.log(`Lorecraft web UI at http://localhost:${webPort}`)
-    }
-
-    if (debug) console.log(`[DEBUG] 调试日志: ${debugPath}`)
-    return
-  }
-
-  // --web [port]  → start both server and web frontend
-  if (hasFlag('--web')) {
-    const wsPort = parseInt(process.env.PORT ?? '3015', 10)
-    const webPort = parseInt(getArgValue('--web') ?? '3016', 10)
-    const { GameServer } = await import('./server/game-server.js')
-    const { WebServer } = await import('./web/web-server.js')
-    const provider = createProvider()
-    const server = new GameServer({ port: wsPort, provider, debug: debugPath, dbPath })
-    await server.start()
-    const web = new WebServer({ port: webPort, wsPort: wsPort })
-    await web.start()
-    console.log(`Lorecraft server listening on ws://localhost:${wsPort}`)
-    console.log(`Lorecraft web UI at http://localhost:${webPort}`)
-    if (debug) console.log(`[DEBUG] 调试日志: ${debugPath}`)
-    return
-  }
-
-  // --connect <url>  → TUI client connecting to server
-  if (hasFlag('--connect')) {
-    const url = getArgValue('--connect') ?? 'ws://localhost:3000'
-    const { TUIClient } = await import('./interface/tui-client.js')
-    const client = new TUIClient(url)
-    await client.start()
-    return
-  }
-
-  // Default: monolithic TUI (backward compatible)
-  if (debug) {
-    console.log(`[DEBUG] 调试模式已开启，日志将写入: ${debugPath}`)
-  }
-
   const provider = createProvider()
-  const { TUIApp } = await import('./interface/tui.js')
-  const app = new TUIApp(provider, { debug: debugPath, dbPath })
-  await app.start()
+
+  const { AppServer } = await import('./server/game-server.js')
+  const server = new AppServer({ port, provider, debug: debugPath, dbPath })
+  await server.start()
+
+  console.log(`Lorecraft running at http://localhost:${port}`)
+  console.log(`[DB] ${dbPath}`)
+  if (debug) console.log(`[DEBUG] ${debugPath}`)
 }
 
 main().catch((err) => {

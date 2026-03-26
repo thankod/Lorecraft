@@ -58,6 +58,14 @@ export type {
 // Orchestration - Pipeline Steps
 export * from './orchestration/steps/index.js'
 
+// Engine
+export { GameLoop } from './engine/game-loop.js'
+export type { GameEventListener } from './engine/game-loop.js'
+
+// Server
+export { AppServer, DEFAULT_PORT } from './server/game-server.js'
+export type { AppServerOptions } from './server/game-server.js'
+
 // Domain Services
 export {
   SignalProcessor,

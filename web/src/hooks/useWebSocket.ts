@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/useGameStore'
 import type { ServerMessage } from '../types/protocol'
 
-const WS_PORT = window.__LORECRAFT_WS_PORT__ || 3015
-const WS_URL = `ws://${location.hostname}:${WS_PORT}`
+const WS_URL = import.meta.env.DEV
+  ? `ws://localhost:${import.meta.env.VITE_WS_PORT || 3016}`
+  : `ws://${location.host}`
 const RECONNECT_DELAY = 3000
 const PING_INTERVAL = 30000
 
@@ -30,7 +31,6 @@ export function useWebSocket() {
             ws.send(JSON.stringify(msg))
           }
         })
-        store.getState().appendNarrative('已连接到服务器…', 'system')
         console.log('[WS] sending initialize')
         ws.send(JSON.stringify({ type: 'initialize' }))
 
@@ -58,7 +58,6 @@ export function useWebSocket() {
         store.getState().setInputEnabled(false)
         store.getState().setSend(() => {})
         if (!unmounted) {
-          store.getState().appendNarrative('与服务器的连接已断开，正在重连…', 'error')
           setTimeout(connect, RECONNECT_DELAY)
         }
       }
