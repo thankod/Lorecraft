@@ -2,6 +2,7 @@ import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { initializeSchema } from './sqlite-schema.js'
+import type { IStoreFactory, SessionInfo } from './store-factory.js'
 import type {
   IEventStore,
   IStateStore,
@@ -20,7 +21,7 @@ import type { SaveFile } from '../../domain/models/session.js'
 // SQLiteStore — unified persistent store backed by SQLite + FTS5
 // ============================================================
 
-export class SQLiteStore {
+export class SQLiteStore implements IStoreFactory {
   private db: Database.Database
 
   constructor(dbPath: string) {
@@ -30,6 +31,12 @@ export class SQLiteStore {
     this.db = new Database(dbPath)
     initializeSchema(this.db)
   }
+
+  get stateStore(): IStateStore { return this.asStateStore() }
+  get eventStore(): IEventStore { return this.asEventStore() }
+  get loreStore(): ILoreStore { return this.asLoreStore() }
+  get longTermMemoryStore(): ILongTermMemoryStore { return this.asLongTermMemoryStore() }
+  get sessionStore(): ISessionStore { return this.asSessionStore() }
 
   close(): void {
     this.db.close()
@@ -657,12 +664,5 @@ export class SQLiteStore {
   }
 }
 
-export interface SessionInfo {
-  id: string
-  genesis_id: string
-  label: string
-  turn: number
-  location: string
-  created_at: number
-  updated_at: number
-}
+// SessionInfo is re-exported from store-factory.ts
+export type { SessionInfo } from './store-factory.js'

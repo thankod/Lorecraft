@@ -148,7 +148,7 @@ export class AISdkProvider implements ILLMProvider {
       model: this.model,
       ...(systemMessage && { system: systemMessage.content }),
       messages: nonSystemMessages,
-      maxOutputTokens: options?.max_tokens ?? 4096,
+      ...(options?.max_tokens && { maxOutputTokens: options.max_tokens }),
       ...(options?.temperature !== undefined && { temperature: options.temperature }),
     })
 

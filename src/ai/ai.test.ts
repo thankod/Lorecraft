@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { ResponseParser } from './parser/response-parser.js'
 import type { ParseError } from './parser/response-parser.js'
 import { PromptRegistry } from './prompt/prompt-registry.js'
+import { loadPromptsFromDirectory } from './prompt/prompt-loader.js'
 import { TokenBudgetManager } from './context/context-assembler.js'
 import type { ContextSection } from './context/context-assembler.js'
 import { AgentRunner } from './runner/agent-runner.js'
@@ -151,7 +152,7 @@ describe('PromptRegistry', () => {
     writeFileSync(join(tmpDir, 'npc_response.prompt'), 'NPC {{npc_name}} says: {{dialogue}}')
     writeFileSync(join(tmpDir, 'not_a_prompt.txt'), 'This should be ignored')
 
-    registry = new PromptRegistry(tmpDir)
+    registry = loadPromptsFromDirectory(tmpDir)
   })
 
   it('loads .prompt files from directory', () => {
@@ -184,7 +185,7 @@ describe('PromptRegistry', () => {
 
   it('fills multiple occurrences of the same placeholder', () => {
     writeFileSync(join(tmpDir, 'repeat.prompt'), '{{name}} meets {{name}}')
-    const reg = new PromptRegistry(tmpDir)
+    const reg = loadPromptsFromDirectory(tmpDir)
 
     const filled = reg.fill('repeat', { name: 'Alice' })
     expect(filled).toBe('Alice meets Alice')

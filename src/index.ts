@@ -3,6 +3,10 @@ export * from './domain/models/index.js'
 
 // Infrastructure - Storage Interfaces
 export type {
+  IStoreFactory,
+  SessionInfo,
+} from './infrastructure/storage/store-factory.js'
+export type {
   IEventStore,
   IStateStore,
   ILoreStore,

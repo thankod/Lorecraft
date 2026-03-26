@@ -3,9 +3,12 @@
 import { config } from 'dotenv'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
 import { setGlobalDispatcher, ProxyAgent } from 'undici'
 import type { ILLMProvider } from './ai/runner/llm-provider.js'
+import { loadPromptsFromDirectory } from './ai/prompt/prompt-loader.js'
+import { initPrompts } from './ai/prompt/prompts.js'
 import { loadLLMConfig, detectEnvConfig, createProviderFromConfig } from './server/llm-config.js'
 
 // ============================================================
@@ -109,6 +112,11 @@ async function main(): Promise<void> {
 
   const xdgData = process.env.XDG_DATA_HOME ?? join(homedir(), '.local', 'share')
   const dbPath = getArgValue('--db') ?? join(xdgData, 'lorecraft', 'game.db')
+
+  // Initialize prompt registry from filesystem
+  const __dirname = fileURLToPath(new URL('.', import.meta.url))
+  const promptsDir = join(__dirname, '..', 'prompts')
+  initPrompts(loadPromptsFromDirectory(promptsDir))
 
   const provider = createProvider()
 

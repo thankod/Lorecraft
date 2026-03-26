@@ -1,0 +1,552 @@
+import type { Database as SqlJsDatabase } from 'sql.js'
+import { CREATE_TABLES, CREATE_FTS, CREATE_FTS_TRIGGERS } from './sqlite-schema.js'
+import type { IStoreFactory, SessionInfo } from './store-factory.js'
+import type {
+  IEventStore,
+  IStateStore,
+  ILoreStore,
+  ILongTermMemoryStore,
+  ISessionStore,
+  LongTermMemoryEntry,
+} from './interfaces.js'
+import type { Event, EventTier1, EventTier2, EventTier3, EventTier4 } from '../../domain/models/event.js'
+import type { GameTimestamp } from '../../domain/models/common.js'
+import type { LoreEntry } from '../../domain/models/lore.js'
+import type { GenesisDocument } from '../../domain/models/genesis.js'
+import type { SaveFile } from '../../domain/models/session.js'
+import { loadFromIndexedDB, createPersistScheduler } from './sqljs-persistence.js'
+
+// ============================================================
+// Helper: sql.js returns results as { columns: string[], values: any[][] }
+// We convert to array of objects for easier use.
+// ============================================================
+
+function queryAll(db: SqlJsDatabase, sql: string, params?: any[]): any[] {
+  const stmt = db.prepare(sql)
+  if (params) stmt.bind(params)
+  const rows: any[] = []
+  while (stmt.step()) {
+    rows.push(stmt.getAsObject())
+  }
+  stmt.free()
+  return rows
+}
+
+function queryOne(db: SqlJsDatabase, sql: string, params?: any[]): any | undefined {
+  const stmt = db.prepare(sql)
+  if (params) stmt.bind(params)
+  let result: any = undefined
+  if (stmt.step()) {
+    result = stmt.getAsObject()
+  }
+  stmt.free()
+  return result
+}
+
+function runSql(db: SqlJsDatabase, sql: string, params?: any[]): void {
+  db.run(sql, params)
+}
+
+// ============================================================
+// SqlJsStore — IStoreFactory backed by sql.js (WASM SQLite)
+// ============================================================
+
+const SCHEMA_VERSION = 2
+
+export class SqlJsStore implements IStoreFactory {
+  private db: SqlJsDatabase
+  private persistScheduler: ReturnType<typeof createPersistScheduler> | null = null
+
+  private constructor(db: SqlJsDatabase) {
+    this.db = db
+  }
+
+  static async create(initSqlJs: () => Promise<{ Database: new (data?: ArrayLike<number>) => SqlJsDatabase }>): Promise<SqlJsStore> {
+    const SQL = await initSqlJs()
+    const savedData = await loadFromIndexedDB()
+    const db = savedData ? new SQL.Database(savedData) : new SQL.Database()
+    const store = new SqlJsStore(db)
+    store.initSchema()
+    store.persistScheduler = createPersistScheduler(() => store.db.export())
+    return store
+  }
+
+  /** For testing: create from an existing sql.js Database instance */
+  static fromDatabase(db: SqlJsDatabase): SqlJsStore {
+    const store = new SqlJsStore(db)
+    store.initSchema()
+    return store
+  }
+
+  private initSchema(): void {
+    // Check current version
+    this.db.run('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+    const row = queryOne(this.db, 'SELECT value FROM meta WHERE key = ?', ['schema_version'])
+    const currentVersion = row ? parseInt(row.value, 10) : 0
+    if (currentVersion >= SCHEMA_VERSION) return
+
+    this.db.run(CREATE_TABLES)
+
+    // FTS5 is not available in default sql.js builds — try and skip if unavailable
+    try {
+      this.db.run(CREATE_FTS)
+      for (const block of CREATE_FTS_TRIGGERS.split(/(?=CREATE TRIGGER)/)) {
+        const trimmed = block.trim()
+        if (trimmed) this.db.run(trimmed)
+      }
+    } catch {
+      // FTS5 not compiled in — full-text search won't be available but core functionality works
+    }
+
+    this.db.run('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)', ['schema_version', String(SCHEMA_VERSION)])
+  }
+
+  private schedulePersist(): void {
+    this.persistScheduler?.schedulePersist()
+  }
+
+  dispose(): void {
+    this.persistScheduler?.dispose()
+    this.db.close()
+  }
+
+  /** Export the database as a Uint8Array */
+  export(): Uint8Array {
+    return this.db.export()
+  }
+
+  // ──────────────────────────────────────────────
+  // IStoreFactory getters
+  // ──────────────────────────────────────────────
+
+  get stateStore(): IStateStore {
+    return {
+      get: <T>(k: string) => this.get<T>(k),
+      set: <T>(k: string, v: T) => this.set(k, v),
+      delete: (k) => this.del(k),
+      listByPrefix: (p) => this.listByPrefix(p),
+    }
+  }
+
+  get eventStore(): IEventStore {
+    return {
+      append: (e) => this.appendEvent(e),
+      getTier1: (id) => this.getTier1(id),
+      getTier2: (id) => this.getTier2(id),
+      getTier3: (id) => this.getTier3(id),
+      getTier4: (id) => this.getTier4(id),
+      getTiers: (id, t) => this.getTiers(id, t),
+      scanByTimeRange: (f, t) => this.scanByTimeRange(f, t),
+      scanByParticipant: (n, l) => this.scanByParticipant(n, l),
+      getAllTier1: () => this.getAllTier1(),
+    }
+  }
+
+  get loreStore(): ILoreStore {
+    return {
+      append: (e) => this.appendLore(e),
+      findBySubject: (s) => this.findBySubject(s),
+      findByContentHash: (h) => this.findByContentHash(h),
+      findByFactType: (t) => this.findByFactType(t),
+      getById: (id) => this.getById(id),
+      update: (id, u) => this.update(id, u),
+    }
+  }
+
+  get longTermMemoryStore(): ILongTermMemoryStore {
+    return {
+      append: (e) => this.appendMemory(e),
+      findByParticipant: (n, p, l) => this.findByParticipant(n, p, l),
+      findByLocation: (n, loc, l) => this.findByLocation(n, loc, l),
+      findRecent: (n, l) => this.findRecent(n, l),
+    }
+  }
+
+  get sessionStore(): ISessionStore {
+    return {
+      saveGenesis: (d) => this.saveGenesis(d),
+      loadGenesis: (id) => this.loadGenesis(id),
+      saveSaveFile: (s) => this.saveSaveFile(s),
+      loadSaveFile: (id) => this.loadSaveFile(id),
+      listSaves: (id) => this.listSaves(id),
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // IEventStore
+  // ──────────────────────────────────────────────
+
+  async appendEvent(event: Event): Promise<void> {
+    runSql(this.db, `
+      INSERT OR REPLACE INTO events
+        (id, title, turn, day, hour, location_id, tags, weight, force_level, created_at,
+         summary, choice_signals, context, related_event_ids, state_snapshot, narrative_text)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      event.id, event.title, event.timestamp.turn, event.timestamp.day, event.timestamp.hour,
+      event.location_id, JSON.stringify(event.tags), event.weight, event.force_level, event.created_at,
+      event.summary, JSON.stringify(event.choice_signals), event.context,
+      JSON.stringify(event.related_event_ids), JSON.stringify(event.state_snapshot), event.narrative_text,
+    ])
+    for (const pid of event.participant_ids) {
+      runSql(this.db, 'INSERT OR IGNORE INTO event_participants (event_id, npc_id) VALUES (?, ?)', [event.id, pid])
+    }
+    this.schedulePersist()
+  }
+
+  async getTier1(event_id: string): Promise<EventTier1 | null> {
+    const row = queryOne(this.db, `
+      SELECT id, title, turn, day, hour, location_id, tags, weight, force_level, created_at
+      FROM events WHERE id = ?
+    `, [event_id])
+    if (!row) return null
+    const participants = queryAll(this.db, 'SELECT npc_id FROM event_participants WHERE event_id = ?', [event_id])
+    return this.rowToTier1(row, participants.map((p: any) => p.npc_id))
+  }
+
+  async getTier2(event_id: string): Promise<EventTier2 | null> {
+    const row = queryOne(this.db, 'SELECT summary, choice_signals FROM events WHERE id = ?', [event_id])
+    if (!row) return null
+    return { summary: row.summary, choice_signals: JSON.parse(row.choice_signals) }
+  }
+
+  async getTier3(event_id: string): Promise<EventTier3 | null> {
+    const row = queryOne(this.db, 'SELECT context, related_event_ids, state_snapshot FROM events WHERE id = ?', [event_id])
+    if (!row) return null
+    return {
+      context: row.context,
+      related_event_ids: JSON.parse(row.related_event_ids),
+      state_snapshot: JSON.parse(row.state_snapshot),
+    }
+  }
+
+  async getTier4(event_id: string): Promise<EventTier4 | null> {
+    const row = queryOne(this.db, 'SELECT narrative_text FROM events WHERE id = ?', [event_id])
+    if (!row) return null
+    return { narrative_text: row.narrative_text }
+  }
+
+  async getTiers(event_id: string, tiers: number[]): Promise<Partial<Event> | null> {
+    const row = queryOne(this.db, 'SELECT * FROM events WHERE id = ?', [event_id])
+    if (!row) return null
+    const participants = queryAll(this.db, 'SELECT npc_id FROM event_participants WHERE event_id = ?', [event_id])
+    const result: Partial<Event> = {}
+    if (tiers.includes(1)) Object.assign(result, this.rowToTier1(row, participants.map((p: any) => p.npc_id)))
+    if (tiers.includes(2)) Object.assign(result, { summary: row.summary, choice_signals: JSON.parse(row.choice_signals) })
+    if (tiers.includes(3)) Object.assign(result, { context: row.context, related_event_ids: JSON.parse(row.related_event_ids), state_snapshot: JSON.parse(row.state_snapshot) })
+    if (tiers.includes(4)) Object.assign(result, { narrative_text: row.narrative_text })
+    return result
+  }
+
+  async scanByTimeRange(from: GameTimestamp, to: GameTimestamp): Promise<EventTier1[]> {
+    const rows = queryAll(this.db, `
+      SELECT e.*, GROUP_CONCAT(ep.npc_id) as participant_csv
+      FROM events e LEFT JOIN event_participants ep ON e.id = ep.event_id
+      WHERE e.turn >= ? AND e.turn <= ?
+      GROUP BY e.id ORDER BY e.turn
+    `, [from.turn, to.turn])
+    return rows.map((r: any) => this.rowToTier1(r, r.participant_csv ? r.participant_csv.split(',') : []))
+  }
+
+  async scanByParticipant(npc_id: string, limit: number): Promise<EventTier1[]> {
+    const rows = queryAll(this.db, `
+      SELECT e.*, GROUP_CONCAT(ep2.npc_id) as participant_csv
+      FROM events e
+      JOIN event_participants ep ON e.id = ep.event_id AND ep.npc_id = ?
+      LEFT JOIN event_participants ep2 ON e.id = ep2.event_id
+      GROUP BY e.id ORDER BY e.turn DESC LIMIT ?
+    `, [npc_id, limit])
+    return rows.map((r: any) => this.rowToTier1(r, r.participant_csv ? r.participant_csv.split(',') : []))
+  }
+
+  async getAllTier1(): Promise<EventTier1[]> {
+    const rows = queryAll(this.db, `
+      SELECT e.*, GROUP_CONCAT(ep.npc_id) as participant_csv
+      FROM events e LEFT JOIN event_participants ep ON e.id = ep.event_id
+      GROUP BY e.id ORDER BY e.turn
+    `)
+    return rows.map((r: any) => this.rowToTier1(r, r.participant_csv ? r.participant_csv.split(',') : []))
+  }
+
+  private rowToTier1(row: any, participant_ids: string[]): EventTier1 {
+    return {
+      id: row.id,
+      title: row.title,
+      timestamp: { day: row.day, hour: row.hour, turn: row.turn },
+      location_id: row.location_id,
+      participant_ids,
+      tags: JSON.parse(row.tags),
+      weight: row.weight,
+      force_level: row.force_level,
+      created_at: row.created_at,
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // IStateStore (generic KV)
+  // ──────────────────────────────────────────────
+
+  async get<T>(key: string): Promise<T | null> {
+    const row = queryOne(this.db, 'SELECT value FROM kv_store WHERE key = ?', [key])
+    if (!row) return null
+    return JSON.parse(row.value) as T
+  }
+
+  async set<T>(key: string, value: T): Promise<void> {
+    runSql(this.db, 'INSERT OR REPLACE INTO kv_store (key, value, updated_at) VALUES (?, ?, unixepoch())', [key, JSON.stringify(value)])
+    this.schedulePersist()
+  }
+
+  async del(key: string): Promise<void> {
+    runSql(this.db, 'DELETE FROM kv_store WHERE key = ?', [key])
+    this.schedulePersist()
+  }
+
+  async listByPrefix(prefix: string): Promise<string[]> {
+    const rows = queryAll(this.db, 'SELECT key FROM kv_store WHERE key LIKE ?', [prefix + '%'])
+    return rows.map((r: any) => r.key)
+  }
+
+  // ──────────────────────────────────────────────
+  // ILoreStore
+  // ──────────────────────────────────────────────
+
+  async appendLore(entry: LoreEntry): Promise<void> {
+    runSql(this.db, `
+      INSERT OR REPLACE INTO lore
+        (id, content, fact_type, authority_level, source_event_id, created_at_turn,
+         causal_chain, related_lore_ids, content_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      entry.id, entry.content, entry.fact_type, entry.authority_level,
+      entry.source_event_id, entry.created_at_turn,
+      JSON.stringify(entry.causal_chain), JSON.stringify(entry.related_lore_ids), entry.content_hash,
+    ])
+    for (const sid of entry.subject_ids) {
+      runSql(this.db, 'INSERT OR IGNORE INTO lore_subjects (lore_id, subject_id) VALUES (?, ?)', [entry.id, sid])
+    }
+    this.schedulePersist()
+  }
+
+  async findBySubject(subject_id: string): Promise<LoreEntry[]> {
+    const rows = queryAll(this.db, `
+      SELECT l.* FROM lore l
+      JOIN lore_subjects ls ON l.id = ls.lore_id
+      WHERE ls.subject_id = ?
+    `, [subject_id])
+    return rows.map((r: any) => this.rowToLore(r))
+  }
+
+  async findByContentHash(hash: string): Promise<LoreEntry | null> {
+    const row = queryOne(this.db, 'SELECT * FROM lore WHERE content_hash = ?', [hash])
+    if (!row) return null
+    return this.rowToLore(row)
+  }
+
+  async findByFactType(fact_type: string): Promise<LoreEntry[]> {
+    const rows = queryAll(this.db, 'SELECT * FROM lore WHERE fact_type = ?', [fact_type])
+    return rows.map((r: any) => this.rowToLore(r))
+  }
+
+  async getById(id: string): Promise<LoreEntry | null> {
+    const row = queryOne(this.db, 'SELECT * FROM lore WHERE id = ?', [id])
+    if (!row) return null
+    return this.rowToLore(row)
+  }
+
+  async update(id: string, updates: Partial<LoreEntry>): Promise<void> {
+    const current = await this.getById(id)
+    if (!current) return
+    await this.appendLore({ ...current, ...updates })
+  }
+
+  private rowToLore(row: any): LoreEntry {
+    const subjects = queryAll(this.db, 'SELECT subject_id FROM lore_subjects WHERE lore_id = ?', [row.id])
+    return {
+      id: row.id,
+      content: row.content,
+      fact_type: row.fact_type,
+      authority_level: row.authority_level,
+      subject_ids: subjects.map((s: any) => s.subject_id),
+      source_event_id: row.source_event_id,
+      created_at_turn: row.created_at_turn,
+      causal_chain: JSON.parse(row.causal_chain),
+      related_lore_ids: JSON.parse(row.related_lore_ids),
+      content_hash: row.content_hash,
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // ILongTermMemoryStore
+  // ──────────────────────────────────────────────
+
+  async appendMemory(entry: LongTermMemoryEntry): Promise<void> {
+    runSql(this.db, `
+      INSERT INTO npc_memories (npc_id, event_id, subjective_summary, distortion_type, recorded_at_turn, location_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [entry.npc_id, entry.event_id, entry.subjective_summary, entry.distortion_type, entry.recorded_at_turn, entry.location_id])
+
+    // Get the inserted row id for participant links
+    const lastRow = queryOne(this.db, 'SELECT last_insert_rowid() as id')
+    const memoryId = lastRow?.id
+    if (memoryId) {
+      for (const pid of entry.participant_ids) {
+        runSql(this.db, 'INSERT OR IGNORE INTO memory_participants (memory_id, npc_id) VALUES (?, ?)', [memoryId, pid])
+      }
+    }
+    this.schedulePersist()
+  }
+
+  async findByParticipant(npc_id: string, participant_id: string, limit: number): Promise<LongTermMemoryEntry[]> {
+    const rows = queryAll(this.db, `
+      SELECT m.* FROM npc_memories m
+      JOIN memory_participants mp ON m.id = mp.memory_id
+      WHERE m.npc_id = ? AND mp.npc_id = ?
+      ORDER BY m.recorded_at_turn DESC LIMIT ?
+    `, [npc_id, participant_id, limit])
+    return rows.map((r: any) => this.rowToMemory(r))
+  }
+
+  async findByLocation(npc_id: string, location_id: string, limit: number): Promise<LongTermMemoryEntry[]> {
+    const rows = queryAll(this.db, `
+      SELECT * FROM npc_memories WHERE npc_id = ? AND location_id = ?
+      ORDER BY recorded_at_turn DESC LIMIT ?
+    `, [npc_id, location_id, limit])
+    return rows.map((r: any) => this.rowToMemory(r))
+  }
+
+  async findRecent(npc_id: string, limit: number): Promise<LongTermMemoryEntry[]> {
+    const rows = queryAll(this.db, `
+      SELECT * FROM npc_memories WHERE npc_id = ?
+      ORDER BY recorded_at_turn DESC LIMIT ?
+    `, [npc_id, limit])
+    return rows.map((r: any) => this.rowToMemory(r))
+  }
+
+  private rowToMemory(row: any): LongTermMemoryEntry {
+    const participants = queryAll(this.db, 'SELECT npc_id FROM memory_participants WHERE memory_id = ?', [row.id])
+    return {
+      event_id: row.event_id,
+      npc_id: row.npc_id,
+      subjective_summary: row.subjective_summary,
+      participant_ids: participants.map((p: any) => p.npc_id),
+      location_id: row.location_id ?? '',
+      recorded_at_turn: row.recorded_at_turn,
+      distortion_type: row.distortion_type,
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // ISessionStore
+  // ──────────────────────────────────────────────
+
+  async saveGenesis(doc: GenesisDocument): Promise<void> {
+    runSql(this.db, 'INSERT OR REPLACE INTO genesis (id, doc) VALUES (?, ?)', [doc.id, JSON.stringify(doc)])
+    this.schedulePersist()
+  }
+
+  async loadGenesis(genesis_id: string): Promise<GenesisDocument | null> {
+    const row = queryOne(this.db, 'SELECT doc FROM genesis WHERE id = ?', [genesis_id])
+    if (!row) return null
+    return JSON.parse(row.doc) as GenesisDocument
+  }
+
+  async saveSaveFile(save: SaveFile): Promise<void> {
+    await this.set(`save:${save.save_id}`, save)
+  }
+
+  async loadSaveFile(save_id: string): Promise<SaveFile | null> {
+    return this.get<SaveFile>(`save:${save_id}`)
+  }
+
+  async listSaves(genesis_id: string): Promise<string[]> {
+    const keys = await this.listByPrefix('save:')
+    const saves: string[] = []
+    for (const key of keys) {
+      const save = await this.get<SaveFile>(key)
+      if (save && save.genesis_document_id === genesis_id) {
+        saves.push(save.save_id)
+      }
+    }
+    return saves
+  }
+
+  // ──────────────────────────────────────────────
+  // Session Management
+  // ──────────────────────────────────────────────
+
+  createSession(id: string, genesisId: string, label: string): void {
+    runSql(this.db, 'INSERT INTO sessions (id, genesis_id, label, is_active) VALUES (?, ?, ?, 1)', [id, genesisId, label])
+    runSql(this.db, 'UPDATE sessions SET is_active = 0 WHERE id != ?', [id])
+    this.schedulePersist()
+  }
+
+  updateSession(id: string, updates: { turn?: number; location?: string; label?: string }): void {
+    const parts: string[] = ['updated_at = unixepoch()']
+    const params: any[] = []
+    if (updates.turn !== undefined) { parts.push('turn = ?'); params.push(updates.turn) }
+    if (updates.location !== undefined) { parts.push('location = ?'); params.push(updates.location) }
+    if (updates.label !== undefined) { parts.push('label = ?'); params.push(updates.label) }
+    params.push(id)
+    runSql(this.db, `UPDATE sessions SET ${parts.join(', ')} WHERE id = ?`, params)
+    this.schedulePersist()
+  }
+
+  activateSession(id: string): void {
+    runSql(this.db, 'UPDATE sessions SET is_active = 0', [])
+    runSql(this.db, 'UPDATE sessions SET is_active = 1 WHERE id = ?', [id])
+    this.schedulePersist()
+  }
+
+  getActiveSession(): SessionInfo | null {
+    const row = queryOne(this.db,
+      'SELECT id, genesis_id, label, turn, location, created_at, updated_at FROM sessions WHERE is_active = 1',
+    )
+    return row ? this.rowToSessionInfo(row) : null
+  }
+
+  listSessions(): SessionInfo[] {
+    const rows = queryAll(this.db,
+      'SELECT id, genesis_id, label, turn, location, created_at, updated_at FROM sessions ORDER BY updated_at DESC',
+    )
+    return rows.map((r: any) => this.rowToSessionInfo(r))
+  }
+
+  deleteSession(id: string): void {
+    const session = queryOne(this.db, 'SELECT genesis_id FROM sessions WHERE id = ?', [id])
+    if (!session) return
+
+    runSql(this.db, "DELETE FROM kv_store WHERE key LIKE ?", [`session:${id}:%`])
+    runSql(this.db, 'DELETE FROM sessions WHERE id = ?', [id])
+
+    const count = queryOne(this.db, 'SELECT COUNT(*) as cnt FROM sessions WHERE genesis_id = ?', [session.genesis_id])
+    if (count.cnt === 0) {
+      runSql(this.db, 'DELETE FROM genesis WHERE id = ?', [session.genesis_id])
+    }
+    this.schedulePersist()
+  }
+
+  resetAll(): void {
+    const tables = [
+      'event_participants', 'events', 'npc_states', 'memory_participants',
+      'npc_memories', 'relationships', 'conversations', 'lore_subjects',
+      'lore', 'injections', 'kv_store', 'sessions', 'genesis',
+    ]
+    for (const table of tables) {
+      runSql(this.db, `DELETE FROM ${table}`)
+    }
+    this.schedulePersist()
+  }
+
+  private rowToSessionInfo(row: any): SessionInfo {
+    return {
+      id: row.id,
+      genesis_id: row.genesis_id,
+      label: row.label,
+      turn: row.turn,
+      location: row.location,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }
+  }
+}

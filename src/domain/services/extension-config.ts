@@ -2,6 +2,7 @@ import type { ILoreStore } from '../../infrastructure/storage/interfaces.js'
 import type { LoreEntry } from '../models/lore.js'
 import type { TierCTemplate } from '../models/character.js'
 import type { TraitConfig } from '../models/trait.js'
+import { uuid } from '../../utils/uuid.js'
 
 // ============================================================
 // Style Config
@@ -296,7 +297,7 @@ export class AuthorTooling implements IAuthorTooling {
     for (const entry of entries) {
       const fullEntry: LoreEntry = {
         ...entry,
-        id: crypto.randomUUID(),
+        id: uuid(),
         content_hash: this.simpleHash(entry.content),
         causal_chain: [],
         related_lore_ids: [],

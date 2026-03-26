@@ -1,11 +1,21 @@
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { PromptRegistry } from './prompt-registry.js'
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url))
-// From src/ai/prompt/ → ../../.. → project root → prompts/
-// From dist/ → .. → project root → prompts/
-const PROMPTS_DIR = join(__dirname, '..', '..', '..', 'prompts')
+let _prompts: PromptRegistry | null = null
 
-/** Shared prompt registry singleton — loaded once from prompts/ directory */
-export const prompts = new PromptRegistry(PROMPTS_DIR)
+export function initPrompts(registry: PromptRegistry): void {
+  _prompts = registry
+}
+
+/** Shared prompt registry — must call initPrompts() before use */
+export const prompts = new Proxy({} as PromptRegistry, {
+  get(_target, prop, receiver) {
+    if (!_prompts) {
+      throw new Error('PromptRegistry not initialized — call initPrompts() first')
+    }
+    const value = (_prompts as any)[prop]
+    if (typeof value === 'function') {
+      return value.bind(_prompts)
+    }
+    return value
+  },
+})

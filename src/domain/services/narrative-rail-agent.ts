@@ -5,6 +5,7 @@ import type { IEventStore, IStateStore } from '../../infrastructure/storage/inte
 import type { NarrativePhase } from '../../domain/models/genesis.js'
 import type { ReflectionInjection, NPCInjection } from '../../domain/models/injection.js'
 import { z } from 'zod/v4'
+import { uuid } from '../../utils/uuid.js'
 
 // ============================================================
 // Drift Assessment Schema
@@ -200,7 +201,7 @@ export class NarrativeRailAgent {
       const result = this.reflectionParser.parse(response.content)
       if (result.success) {
         const injection: ReflectionInjection = {
-          id: crypto.randomUUID(),
+          id: uuid(),
           voice_id: result.data.voice_id,
           content: result.data.content,
           priority: 'LOW',
@@ -242,7 +243,7 @@ export class NarrativeRailAgent {
       const result = this.npcTopicParser.parse(response.content)
       if (result.success) {
         const injection: NPCInjection = {
-          id: crypto.randomUUID(),
+          id: uuid(),
           npc_id: npcId,
           context: result.data.context,
           condition: result.data.condition,

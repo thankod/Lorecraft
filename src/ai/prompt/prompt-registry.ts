@@ -1,11 +1,25 @@
-import { readFileSync, readdirSync } from 'node:fs'
-import { join, basename } from 'node:path'
-
 export class PromptRegistry {
   private templates = new Map<string, string>()
 
-  constructor(directory: string) {
-    this.loadFromDirectory(directory)
+  constructor(templates: Map<string, string> | Record<string, string>) {
+    if (templates instanceof Map) {
+      this.templates = templates
+    } else {
+      for (const [key, value] of Object.entries(templates)) {
+        this.templates.set(key, value)
+      }
+    }
+  }
+
+  /** Browser-friendly: create from Vite import.meta.glob result or plain record */
+  static fromRecord(modules: Record<string, string>): PromptRegistry {
+    const map = new Map<string, string>()
+    for (const [path, content] of Object.entries(modules)) {
+      // Extract name from path like '../../../prompts/foo.prompt' → 'foo'
+      const name = path.split('/').pop()!.replace('.prompt', '')
+      map.set(name, content)
+    }
+    return new PromptRegistry(map)
   }
 
   get(name: string): string {
@@ -41,14 +55,5 @@ export class PromptRegistry {
 
   names(): string[] {
     return [...this.templates.keys()]
-  }
-
-  private loadFromDirectory(directory: string): void {
-    const files = readdirSync(directory).filter((f) => f.endsWith('.prompt'))
-    for (const file of files) {
-      const name = basename(file, '.prompt')
-      const content = readFileSync(join(directory, file), 'utf-8')
-      this.templates.set(name, content)
-    }
   }
 }

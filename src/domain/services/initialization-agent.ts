@@ -17,6 +17,7 @@ import type { LoreEntry } from '../models/lore.js'
 import type { NPCProfile } from '../models/lore.js'
 import type { EventBus } from './event-bus.js'
 import type { ExtensionConfigLoader, StyleConfig } from './extension-config.js'
+import { uuid } from '../../utils/uuid.js'
 
 // ============================================================
 // InitializationAgent
@@ -239,7 +240,7 @@ export class InitializationAgent {
 
     // Inject top-level metadata if missing
     if (!parsed.id) {
-      parsed.id = crypto.randomUUID()
+      parsed.id = uuid()
     }
     if (!parsed.created_at) {
       parsed.created_at = Date.now()
@@ -342,7 +343,7 @@ export class InitializationAgent {
   private async writeAuthorPresetLore(doc: GenesisDocument): Promise<void> {
     // World setting as lore
     const worldLore: LoreEntry = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       content: `${doc.world_setting.background}\n核心冲突：${doc.world_setting.core_conflict}`,
       fact_type: 'WORLD',
       authority_level: 'AUTHOR_PRESET',
@@ -358,7 +359,7 @@ export class InitializationAgent {
     // Hidden secrets as lore
     for (const secret of doc.world_setting.hidden_secrets) {
       await this.loreStore.append({
-        id: crypto.randomUUID(),
+        id: uuid(),
         content: secret,
         fact_type: 'WORLD',
         authority_level: 'AUTHOR_PRESET',
@@ -374,7 +375,7 @@ export class InitializationAgent {
     // NPC profiles as lore
     for (const npc of doc.characters.tier_a_npcs) {
       await this.loreStore.append({
-        id: crypto.randomUUID(),
+        id: uuid(),
         content: `${npc.name}：${npc.background}`,
         fact_type: 'NPC_PERSONAL',
         authority_level: 'AUTHOR_PRESET',
@@ -401,7 +402,7 @@ export class InitializationAgent {
     // Faction lore
     for (const faction of doc.world_setting.factions) {
       await this.loreStore.append({
-        id: crypto.randomUUID(),
+        id: uuid(),
         content: `${faction.name}：${faction.description}`,
         fact_type: 'ORGANIZATION',
         authority_level: 'AUTHOR_PRESET',
@@ -580,7 +581,7 @@ export class InitializationAgent {
     const inciting = doc.narrative_structure.inciting_event
 
     const event: Event = {
-      id: crypto.randomUUID(),
+      id: uuid(),
       title: inciting.title,
       timestamp: { day: 0, hour: 0, turn: 0 },
       location_id: inciting.location_id,

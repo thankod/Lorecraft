@@ -2,6 +2,7 @@ import type { IStateStore } from '../../infrastructure/storage/interfaces.js'
 import type { EventTier1 } from '../../domain/models/event.js'
 import type { RelationshipEntry } from '../../domain/models/character.js'
 import type { IInjectionQueueManager } from './injection-queue-manager.js'
+import { uuid } from '../../utils/uuid.js'
 
 // ============================================================
 // PropagationEntry
@@ -112,7 +113,7 @@ export class PropagationScheduler {
 
     for (const entry of due) {
       this.injectionQueueManager.enqueueNPC({
-        id: crypto.randomUUID(),
+        id: uuid(),
         npc_id: entry.target_npc_id,
         context: `你听说了：${entry.source_event_title}。${entry.tier2_summary}`,
         condition: 'propagation',

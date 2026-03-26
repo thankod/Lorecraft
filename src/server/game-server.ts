@@ -4,6 +4,8 @@ import { join, extname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer, WebSocket } from 'ws'
 import type { ILLMProvider } from '../ai/runner/llm-provider.js'
+import { FileDebugLogger } from '../ai/runner/file-debug-logger.js'
+import { SQLiteStore } from '../infrastructure/storage/sqlite-store.js'
 import { GameLoop } from '../engine/game-loop.js'
 import type { GameEventListener } from '../engine/game-loop.js'
 import type { GenesisDocument } from '../domain/models/genesis.js'
@@ -106,10 +108,11 @@ export class AppServer implements GameEventListener {
 
   constructor(options: AppServerOptions) {
     this.options = options
-    this.gameLoop = new GameLoop(options.provider, {
-      debug: options.debug,
-      dbPath: options.dbPath,
-    })
+    const store = new SQLiteStore(options.dbPath ?? ':memory:')
+    const debugLogger = options.debug
+      ? new FileDebugLogger(typeof options.debug === 'string' ? options.debug : './debug.log')
+      : undefined
+    this.gameLoop = new GameLoop(store, options.provider, { debugLogger })
     this.gameLoop.setListener(this)
   }
 

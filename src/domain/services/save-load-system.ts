@@ -10,6 +10,7 @@ import type { CharacterDynamicState, MemoryBuffer, ConversationHistory } from '.
 import type { TraitWeight } from '../models/trait.js'
 import type { ReflectionInjection, NPCInjection } from '../models/injection.js'
 import type { IInjectionQueueManager } from './injection-queue-manager.js'
+import { uuid } from '../../utils/uuid.js'
 
 // ============================================================
 // SaveLoadSystem
@@ -39,7 +40,7 @@ export class SaveLoadSystem {
   // ---- Save ----
 
   async save(genesisDocumentId: string, currentTurn: number): Promise<string> {
-    const saveId = crypto.randomUUID()
+    const saveId = uuid()
 
     // Gather world state
     const worldStateKeys = [

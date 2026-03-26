@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [react()],
@@ -7,10 +8,15 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
+  resolve: {
+    alias: {
+      '@engine': resolve(__dirname, '../src'),
+    },
+  },
   server: {
     port: 5173,
-    proxy: {
-      '/ws': { target: 'ws://localhost:3016', ws: true },
-    },
+  },
+  optimizeDeps: {
+    exclude: ['sql.js'],
   },
 })

@@ -196,7 +196,7 @@ export class WorldAgent {
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      { temperature: 0.7, max_tokens: 2048, agent_type: 'LazyEvalInference' },
+      { temperature: 0.7, agent_type: 'LazyEvalInference' },
     )
 
     const parseResult = this.lazyEvalParser.parse(llmResponse.content)

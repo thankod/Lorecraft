@@ -4,6 +4,7 @@ import { prompts } from '../../ai/prompt/prompts.js'
 import type { ILoreStore, IStateStore } from '../../infrastructure/storage/interfaces.js'
 import type { LoreEntry, NPCProfile } from '../../domain/models/lore.js'
 import { z } from 'zod/v4'
+import { uuid } from '../../utils/uuid.js'
 
 // ============================================================
 // Schemas
@@ -141,7 +142,7 @@ export class LoreCanonicalizer {
 
       if (verdict.verdict === 'CONSISTENT' || verdict.verdict === 'SUPPLEMENTARY') {
         const entry: LoreEntry = {
-          id: crypto.randomUUID(),
+          id: uuid(),
           content: fact.content,
           fact_type: fact.fact_type,
           authority_level: 'AI_CANONICALIZED',

@@ -1,7 +1,7 @@
 import type { ILLMProvider } from '../ai/runner/llm-provider.js'
 import { AgentRunner } from '../ai/runner/agent-runner.js'
-import { SQLiteStore } from '../infrastructure/storage/sqlite-store.js'
-import type { SessionInfo } from '../infrastructure/storage/sqlite-store.js'
+import type { IDebugLogger } from '../ai/runner/debug-logger.js'
+import type { IStoreFactory, SessionInfo } from '../infrastructure/storage/store-factory.js'
 import type { IStateStore, IEventStore, ILoreStore, ILongTermMemoryStore, ISessionStore } from '../infrastructure/storage/interfaces.js'
 import { MainPipeline, PipelineExecutionError, createPipelineContext } from '../orchestration/pipeline/index.js'
 import type { NarrativeOutput } from '../orchestration/pipeline/types.js'
@@ -56,6 +56,7 @@ import type { GenesisDocument } from '../domain/models/genesis.js'
 import type { LocationEdge } from '../domain/models/world.js'
 import type { PlayerAttributes } from '../domain/models/attributes.js'
 import { randomAllocate, validateAllocation, ATTRIBUTE_IDS, ATTRIBUTE_META } from '../domain/models/attributes.js'
+import { uuid } from '../utils/uuid.js'
 
 // ============================================================
 // Game State
@@ -95,7 +96,7 @@ export interface GameEventListener {
 // ============================================================
 
 export class GameLoop {
-  private sqliteStore: SQLiteStore
+  private store: IStoreFactory
   private stateStore: IStateStore
   private eventStore: IEventStore
   private loreStore: ILoreStore
@@ -124,20 +125,20 @@ export class GameLoop {
   private awaitingStyleSelect = false
   private selectedStyle: StyleConfig | null = null
 
-  constructor(provider: ILLMProvider, options?: { debug?: boolean | string; dbPath?: string }) {
-    this.sqliteStore = new SQLiteStore(options?.dbPath ?? ':memory:')
-    this.stateStore = this.sqliteStore.asStateStore()
-    this.eventStore = this.sqliteStore.asEventStore()
-    this.loreStore = this.sqliteStore.asLoreStore()
-    this.longTermMemoryStore = this.sqliteStore.asLongTermMemoryStore()
-    this.sessionStore = this.sqliteStore.asSessionStore()
+  constructor(store: IStoreFactory, provider: ILLMProvider, options?: { debugLogger?: IDebugLogger }) {
+    this.store = store
+    this.stateStore = store.stateStore
+    this.eventStore = store.eventStore
+    this.loreStore = store.loreStore
+    this.longTermMemoryStore = store.longTermMemoryStore
+    this.sessionStore = store.sessionStore
     this.injectionQueueManager = new InMemoryInjectionQueueManager()
     this.agentRunner = new AgentRunner(provider, {
       timeout_ms: 120_000,
       max_retries: 2,
       base_delay_ms: 2000,
       language: '中文',
-      debug: options?.debug,
+      debugLogger: options?.debugLogger,
     })
     this.configLoader = new ExtensionConfigLoader()
     this.signalProcessor = new SignalProcessor(this.stateStore, this.configLoader.getTraitConfigs())
@@ -229,7 +230,7 @@ export class GameLoop {
         })
       }
 
-      const sessionId = crypto.randomUUID()
+      const sessionId = uuid()
       const startLocation = doc.initial_locations[0]?.id ?? 'unknown'
 
       this.gameState = {
@@ -295,12 +296,12 @@ export class GameLoop {
     // Create a session record
     const worldSetting = this.gameState.genesisDoc.world_setting
     const label = worldSetting?.tone ?? '未命名世界'
-    this.sqliteStore.createSession(
+    this.store.createSession(
       this.gameState.sessionId,
       this.gameState.genesisDoc.id,
       label,
     )
-    this.sqliteStore.updateSession(this.gameState.sessionId, {
+    this.store.updateSession(this.gameState.sessionId, {
       location: this.gameState.currentLocation,
     })
 
@@ -335,13 +336,13 @@ export class GameLoop {
   }
 
   reset(): void {
-    // Wipe all data in SQLite and re-create adapters
-    this.sqliteStore.resetAll()
-    this.stateStore = this.sqliteStore.asStateStore()
-    this.eventStore = this.sqliteStore.asEventStore()
-    this.loreStore = this.sqliteStore.asLoreStore()
-    this.longTermMemoryStore = this.sqliteStore.asLongTermMemoryStore()
-    this.sessionStore = this.sqliteStore.asSessionStore()
+    // Wipe all data and re-acquire adapters
+    this.store.resetAll()
+    this.stateStore = this.store.stateStore
+    this.eventStore = this.store.eventStore
+    this.loreStore = this.store.loreStore
+    this.longTermMemoryStore = this.store.longTermMemoryStore
+    this.sessionStore = this.store.sessionStore
     this.injectionQueueManager = new InMemoryInjectionQueueManager()
     this.signalProcessor = new SignalProcessor(this.stateStore, this.configLoader.getTraitConfigs())
     this.locationGraph = new LocationGraph([])
@@ -545,7 +546,7 @@ export class GameLoop {
       this.listener?.onStatus(this.gameState.currentLocation, this.gameState.currentTurn)
 
       // Update session record
-      this.sqliteStore.updateSession(this.gameState.sessionId, {
+      this.store.updateSession(this.gameState.sessionId, {
         turn: this.gameState.currentTurn,
         location: this.gameState.currentLocation,
       })
@@ -705,7 +706,7 @@ export class GameLoop {
               // Level 3: also inject as high-priority reflection so it flows
               // through the full pipeline on the next turn (context, voices, event generation)
               this.injectionQueueManager.enqueueReflection({
-                id: crypto.randomUUID(),
+                id: uuid(),
                 voice_id: 'narrator',
                 content: `[NPC主动行动] ${intervention.action_description}`,
                 priority: 'HIGH',
@@ -799,17 +800,17 @@ export class GameLoop {
   // ---- Session Management ----
 
   listSessions(): SessionInfo[] {
-    return this.sqliteStore.listSessions()
+    return this.store.listSessions()
   }
 
   /** Check if there's an active session that can be resumed */
   getActiveSession(): SessionInfo | null {
-    return this.sqliteStore.getActiveSession()
+    return this.store.getActiveSession()
   }
 
   /** Resume an existing session by loading its genesis doc and state */
   async switchSession(sessionId: string): Promise<boolean> {
-    const sessions = this.sqliteStore.listSessions()
+    const sessions = this.store.listSessions()
     const target = sessions.find((s) => s.id === sessionId)
     if (!target) return false
 
@@ -818,7 +819,7 @@ export class GameLoop {
     if (!doc) return false
 
     // Activate session
-    this.sqliteStore.activateSession(sessionId)
+    this.store.activateSession(sessionId)
 
     // Rebuild game state
     this.gameState = {
@@ -853,7 +854,7 @@ export class GameLoop {
   }
 
   deleteSession(sessionId: string): void {
-    this.sqliteStore.deleteSession(sessionId)
+    this.store.deleteSession(sessionId)
     // If we deleted the active session, clear game state
     if (this.gameState?.sessionId === sessionId) {
       this.gameState = null

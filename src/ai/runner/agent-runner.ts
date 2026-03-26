@@ -1,4 +1,4 @@
-import { appendFileSync, writeFileSync } from 'node:fs'
+import type { IDebugLogger } from './debug-logger.js'
 import type { ILLMProvider, LLMMessage, LLMResponse } from './llm-provider.js'
 
 export interface LLMCallLog {
@@ -17,7 +17,7 @@ export interface AgentRunnerOptions {
   max_retries?: number
   base_delay_ms?: number
   language?: string
-  debug?: boolean | string  // true = './debug.log', string = custom path
+  debugLogger?: IDebugLogger
 }
 
 function simpleHash(str: string): string {
@@ -50,7 +50,7 @@ export class AgentRunner {
   private maxRetries: number
   private baseDelay: number
   private language: string | undefined
-  private debugPath: string | null
+  private logger: IDebugLogger | null
   private turnCounter = 0
   private _pendingUsage: TokenUsage[] = []
   private _pendingCalls: LLMCallDetail[] = []
@@ -65,20 +65,15 @@ export class AgentRunner {
     this.maxRetries = options?.max_retries ?? 3
     this.baseDelay = options?.base_delay_ms ?? 1_000
     this.language = options?.language
-    this.debugPath = options?.debug
-      ? typeof options.debug === 'string' ? options.debug : './debug.log'
-      : null
-    if (this.debugPath) {
-      writeFileSync(this.debugPath, `=== Lorecraft Debug Log ===\nStarted: ${new Date().toISOString()}\n\n`)
-    }
+    this.logger = options?.debugLogger ?? null
   }
 
   /** Call this at the start of each player turn to mark turn boundaries in the log. */
   markTurn(turnNumber: number, playerInput?: string): void {
     this.turnCounter = turnNumber
-    if (this.debugPath) {
+    if (this.logger) {
       const sep = '═'.repeat(80)
-      appendFileSync(this.debugPath, `\n${sep}\n  TURN ${turnNumber}${playerInput ? `  |  玩家输入: ${playerInput}` : ''}\n${sep}\n\n`)
+      this.logger.append(`\n${sep}\n  TURN ${turnNumber}${playerInput ? `  |  玩家输入: ${playerInput}` : ''}\n${sep}\n\n`)
     }
   }
 
@@ -189,7 +184,7 @@ export class AgentRunner {
     responseContent: string | null,
     error?: string,
   ): void {
-    if (!this.debugPath) return
+    if (!this.logger) return
 
     const lines: string[] = []
     const sep = '─'.repeat(60)
@@ -217,7 +212,7 @@ export class AgentRunner {
     }
 
     lines.push('\n')
-    appendFileSync(this.debugPath, lines.join('\n'))
+    this.logger.append(lines.join('\n'))
   }
 
   private callWithTimeout(

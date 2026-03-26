@@ -12,6 +12,7 @@ import { EventGeneratorOutputSchema, SignalBOutputSchema, PacingCheckOutputSchem
 import { ResponseParser } from '../../ai/parser/response-parser.js'
 import { prompts } from '../../ai/prompt/prompts.js'
 import { z } from 'zod/v4'
+import { uuid } from '../../utils/uuid.js'
 
 // ============================================================
 // Intermediate type for event data flowing through the pipeline
@@ -358,7 +359,7 @@ export class EventIdStep implements IPipelineStep<EventGeneratorOutput, EventPip
     input: EventGeneratorOutput,
     context: PipelineContext,
   ): Promise<StepResult<EventPipelineData>> {
-    const eventId = crypto.randomUUID()
+    const eventId = uuid()
     context.data.set('event_id', eventId)
 
     const arbitration = context.data.get('arbitration_result') as ArbitrationResult

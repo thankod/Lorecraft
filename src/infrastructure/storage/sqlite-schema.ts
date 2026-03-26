@@ -1,4 +1,9 @@
-import type Database from 'better-sqlite3'
+// Duck-typed database interface for both better-sqlite3 and sql.js
+export interface ISchemaDatabase {
+  exec(sql: string): void
+  prepare(sql: string): { get(...params: any[]): any; run(...params: any[]): any }
+  pragma?(sql: string): any
+}
 
 // ============================================================
 // Schema version — bump when adding migrations
@@ -285,9 +290,9 @@ END;
 // Initialize database with schema
 // ============================================================
 
-export function initializeSchema(db: Database.Database): void {
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
+export function initializeSchema(db: ISchemaDatabase): void {
+  db.pragma?.('journal_mode = WAL')
+  db.pragma?.('foreign_keys = ON')
 
   // Check current version
   db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
@@ -296,18 +301,18 @@ export function initializeSchema(db: Database.Database): void {
 
   if (currentVersion >= SCHEMA_VERSION) return
 
-  // Apply schema in a transaction
-  db.transaction(() => {
-    db.exec(CREATE_TABLES)
-    db.exec(CREATE_FTS)
+  db.exec(CREATE_TABLES)
+  db.exec(CREATE_FTS)
 
-    // Triggers must be executed one at a time — split on CREATE TRIGGER boundary
-    for (const block of CREATE_FTS_TRIGGERS.split(/(?=CREATE TRIGGER)/)) {
-      const trimmed = block.trim()
-      if (trimmed) db.exec(trimmed)
-    }
+  // Triggers must be executed one at a time — split on CREATE TRIGGER boundary
+  for (const block of CREATE_FTS_TRIGGERS.split(/(?=CREATE TRIGGER)/)) {
+    const trimmed = block.trim()
+    if (trimmed) db.exec(trimmed)
+  }
 
-    // Update version
-    db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('schema_version', String(SCHEMA_VERSION))
-  })()
+  // Update version
+  db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run('schema_version', String(SCHEMA_VERSION))
 }
+
+/** Exported SQL for reuse in sql.js implementation */
+export { CREATE_TABLES, CREATE_FTS, CREATE_FTS_TRIGGERS }

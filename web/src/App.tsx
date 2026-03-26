@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useWebSocket } from './hooks/useWebSocket'
+import { useEngine } from './hooks/useEngine'
 import { TitleBar } from './components/TitleBar'
 import { TabBar } from './components/TabBar'
 import { BottomBar } from './components/BottomBar'
@@ -15,7 +15,7 @@ import './tabs/DebugTab'
 import './tabs/SettingsTab'
 
 export function App() {
-  useWebSocket()
+  useEngine()
   const [activeTab, setActiveTab] = useState('narrative')
 
   const ActiveComponent = tabs.find((t) => t.id === activeTab)?.component
