@@ -33,6 +33,7 @@ export class InitializationAgent {
   private readonly configLoader: ExtensionConfigLoader
   private readonly genesisParser = new ResponseParser(GenesisDocumentSchema)
   private readonly onProgress: (msg: string) => void
+  private readonly onStep: (name: string, phase: 'start' | 'end') => void
 
   constructor(deps: {
     agentRunner: AgentRunner
@@ -43,6 +44,7 @@ export class InitializationAgent {
     eventBus?: EventBus
     configLoader: ExtensionConfigLoader
     onProgress?: (msg: string) => void
+    onStep?: (name: string, phase: 'start' | 'end') => void
   }) {
     this.agentRunner = deps.agentRunner
     this.stateStore = deps.stateStore
@@ -52,6 +54,7 @@ export class InitializationAgent {
     this.eventBus = deps.eventBus ?? null
     this.configLoader = deps.configLoader
     this.onProgress = deps.onProgress ?? (() => {})
+    this.onStep = deps.onStep ?? (() => {})
   }
 
   /**
@@ -62,27 +65,37 @@ export class InitializationAgent {
     const t0 = Date.now()
 
     // Step 1: Load style config
+    this.onStep('LoadStyleConfig', 'start')
     this.onProgress('正在加载风格配置…')
     const styleConfig = this.configLoader.getStyleConfig()
+    this.onStep('LoadStyleConfig', 'end')
 
     // Step 2: Generate GenesisDocument via LLM
+    this.onStep('WorldGenerator', 'start')
     this.onProgress('正在调用大模型生成世界…')
     const genesisDoc = await this.generateGenesisDocument(styleConfig)
     this.onProgress(`世界生成完成 (${((Date.now() - t0) / 1000).toFixed(1)}s)`)
+    this.onStep('WorldGenerator', 'end')
 
     // Step 3: Validation (handled by ResponseParser in step 2)
 
     // Step 4: Persist genesis document
+    this.onStep('PersistGenesis', 'start')
     this.onProgress('正在保存创世文档…')
     await this.sessionStore.saveGenesis(genesisDoc)
+    this.onStep('PersistGenesis', 'end')
 
     // Step 5: Distribute to modules (strict ordering)
+    this.onStep('DistributeToModules', 'start')
     this.onProgress('正在初始化世界状态…')
     await this.distributeToModules(genesisDoc)
+    this.onStep('DistributeToModules', 'end')
 
     // Step 6: Broadcast inciting event
+    this.onStep('BroadcastIncitingEvent', 'start')
     this.onProgress('正在生成序幕事件…')
     await this.broadcastIncitingEvent(genesisDoc)
+    this.onStep('BroadcastIncitingEvent', 'end')
 
     this.onProgress(`初始化完成 (总计 ${((Date.now() - t0) / 1000).toFixed(1)}s)`)
     return genesisDoc

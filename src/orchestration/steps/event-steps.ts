@@ -169,7 +169,11 @@ export class EventGeneratorStep
     // Player wish from world assertions — low-priority, may or may not happen
     const playerWish = context.data.get('player_wish') as string[] | undefined
 
+    // Pass player's original text so EventGenerator can preserve tone and nuance
+    const originalText = context.data.get('original_text') as string | undefined
+
     const userMessage = JSON.stringify({
+      player_input: originalText ?? null,
       action: input.action,
       force_flag: input.force_flag,
       force_level: input.force_level,

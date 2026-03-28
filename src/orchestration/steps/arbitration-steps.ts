@@ -199,7 +199,10 @@ export class ActionArbiterStep implements IPipelineStep<AtomicAction, AtomicActi
       attribute_list: attrListStr,
     })
 
+    const originalText = context.data.get('original_text') as string | undefined
+
     const userMessage = JSON.stringify({
+      player_input: originalText ?? null,
       action: input,
       subjective_memory: subjectiveMemory,
       objective_world_state: objectiveState,

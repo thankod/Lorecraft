@@ -228,6 +228,12 @@ export class GameLoop {
     this.configLoader = new ExtensionConfigLoader({ style: this.selectedStyle })
     this.listener?.onInitProgress(`正在生成游戏世界…`)
 
+    // Emit debug turn 0 for world generation
+    this.listener?.onDebugTurnStart?.(0, '[世界生成]')
+    const stepTimers = new Map<string, number>()
+    const runner = this.agentRunner
+    const listener = this.listener
+
     const initAgent = new InitializationAgent({
       agentRunner: this.agentRunner,
       stateStore: this.stateStore,
@@ -237,6 +243,54 @@ export class GameLoop {
       eventBus: this.eventBus,
       configLoader: this.configLoader,
       onProgress: (msg) => this.listener?.onInitProgress(msg),
+      onStep: (name, phase) => {
+        if (phase === 'start') {
+          runner.drainUsage()
+          runner.drainCalls()
+          stepTimers.set(name, performance.now())
+          listener?.onDebugStep?.(name, 'start')
+        } else {
+          const startTime = stepTimers.get(name) ?? performance.now()
+          const duration_ms = Math.round((performance.now() - startTime) * 100) / 100
+          const stepUsage = runner.drainUsage()
+          const stepCalls = runner.drainCalls()
+
+          let data: string | undefined
+          try {
+            const payload: Record<string, unknown> = {}
+            if (stepUsage.length > 0) {
+              payload.tokens = {
+                input_tokens: stepUsage.reduce((s, u) => s + u.input_tokens, 0),
+                output_tokens: stepUsage.reduce((s, u) => s + u.output_tokens, 0),
+                llm_calls: stepUsage.length,
+              }
+            }
+            if (stepCalls.length > 0) {
+              payload.llm_calls = stepCalls.map((c) => ({
+                agent_type: c.agent_type,
+                duration_ms: c.duration_ms,
+                usage: c.usage,
+                messages: c.messages.map((m) => ({
+                  role: m.role,
+                  content: m.content.length > 3000
+                    ? m.content.slice(0, 3000) + '\n... [truncated]'
+                    : m.content,
+                })),
+                response: c.response.length > 5000
+                  ? c.response.slice(0, 5000) + '\n... [truncated]'
+                  : c.response,
+              }))
+            }
+            data = JSON.stringify(payload, null, 2)
+            if (data && data.length > 30000) {
+              data = data.slice(0, 30000) + '\n... [truncated]'
+            }
+          } catch {
+            data = '[unserializable]'
+          }
+          listener?.onDebugStep?.(name, 'end', 'continue', duration_ms, data)
+        }
+      },
     })
 
     try {
@@ -436,6 +490,9 @@ export class GameLoop {
       if (subjectiveMemory) {
         context.data.set('recent_context', subjectiveMemory)
       }
+
+      // Store original player text for downstream steps
+      context.data.set('original_text', playerInput)
 
       // Inject persisted insistence state
       context.data.set('insistence_state', this.insistenceState)

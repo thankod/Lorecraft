@@ -52,6 +52,8 @@ function PipelineView() {
   }, [debugTurns, initLog])
 
   const empty = initLog.length === 0 && debugTurns.length === 0
+  // Hide InitBlock when turn 0 debug data exists (TurnBlock shows detailed LLM info)
+  const hasTurn0Debug = debugTurns.some(t => t.turn === 0 && t.steps.length > 0)
 
   return (
     <div className="debug-pipeline-view" ref={containerRef}>
@@ -59,7 +61,7 @@ function PipelineView() {
         <div className="debug-empty">等待游戏开始以查看调试信息…</div>
       ) : (
         <>
-          {initLog.length > 0 && <InitBlock log={initLog} />}
+          {initLog.length > 0 && !hasTurn0Debug && <InitBlock log={initLog} />}
           {debugTurns.map((turn, i) => <TurnBlock key={i} turn={turn} isLast={i === debugTurns.length - 1} />)}
         </>
       )}
@@ -99,8 +101,37 @@ function InitBlock({ log }: { log: Array<{ message: string; timestamp: number }>
   )
 }
 
+function buildTurnReport(turn: DebugTurn, steps: GroupedStep[]): string {
+  const report: Record<string, unknown> = {
+    turn: turn.turn,
+    input: turn.input,
+    steps: steps.map((step) => {
+      const entry: Record<string, unknown> = {
+        name: step.name,
+        status: step.status,
+        duration_ms: step.duration_ms,
+      }
+      if (step.tokens) entry.tokens = step.tokens
+      if (step.llmCalls) {
+        entry.llm_calls = step.llmCalls.map((c) => ({
+          agent_type: c.agent_type,
+          duration_ms: c.duration_ms,
+          usage: c.usage,
+          messages: c.messages,
+          response: c.response,
+        }))
+      }
+      if (step.contextData) entry.context_data = step.contextData
+      return entry
+    }),
+  }
+  if (turn.states) report.states = turn.states
+  return JSON.stringify(report, null, 2)
+}
+
 function TurnBlock({ turn, isLast }: { turn: DebugTurn; isLast: boolean }) {
   const [expanded, setExpanded] = useState(isLast)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (isLast) setExpanded(true)
@@ -115,6 +146,15 @@ function TurnBlock({ turn, isLast }: { turn: DebugTurn; isLast: boolean }) {
   const completedSteps = steps.filter(s => !s.running).length
   const hasRunning = steps.some(s => s.running)
 
+  const handleCopyReport = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    const report = buildTurnReport(turn, steps)
+    navigator.clipboard.writeText(report).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
   return (
     <div className="debug-turn">
       <div className="debug-turn-header" onClick={() => setExpanded(!expanded)}>
@@ -127,6 +167,11 @@ function TurnBlock({ turn, isLast }: { turn: DebugTurn; isLast: boolean }) {
         )}
         <span className="debug-turn-count">{completedSteps}/{steps.length} 步</span>
         {hasRunning && <span className="debug-turn-running">运行中</span>}
+        {steps.length > 0 && (
+          <button className="debug-turn-copy" onClick={handleCopyReport} title="复制该回合完整调试报告">
+            {copied ? '已复制' : '复制报告'}
+          </button>
+        )}
       </div>
       {expanded && (
         <div className="debug-turn-body">
