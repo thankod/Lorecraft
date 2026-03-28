@@ -303,3 +303,15 @@
   transform: translateX(16px);
   background: var(--title);
 }
+
+/* ── Build Info ── */
+.settings-build-info {
+  margin-top: var(--space-lg);
+  padding: 12px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+  opacity: 0.5;
+  text-align: center;
+  border-top: 1px solid var(--border-subtle);
+}
