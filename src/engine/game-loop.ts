@@ -390,28 +390,8 @@ export class GameLoop {
       location: this.gameState.currentLocation,
     })
 
-    // Create initial quest graph from genesis data
-    const narrativeStructure = this.gameState.genesisDoc.narrative_structure
-    const worldSetting2 = this.gameState.genesisDoc.world_setting
-    const phases = narrativeStructure.phases ?? []
-
-    const mainTitle = worldSetting2?.core_conflict
-      ?? narrativeStructure.final_goal_description
-      ?? '主线任务'
-    const mainHint = phases[0]?.direction_summary ?? '探索这个世界'
-
-    const initialGraph: QuestGraph = {
-      quests: [{ id: 'main', title: mainTitle, status: 'active', created_at_turn: 0 }],
-      nodes: [{
-        id: 'main_0',
-        quest_id: 'main',
-        summary: narrativeStructure.inciting_event.narrative_text,
-        hint: mainHint,
-        status: 'active',
-        turn: 0,
-      }],
-      edges: [],
-    }
+    // Initialize empty quest graph — quests emerge organically via QuestTrackingStep
+    const initialGraph: QuestGraph = { quests: [], nodes: [], edges: [] }
     await this.stateStore.set('quests:graph', initialGraph)
 
     // Now start the game proper
