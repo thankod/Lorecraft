@@ -16,6 +16,12 @@ export interface GameplayOptions {
   world_assertion: boolean
 }
 
+export interface QuestGraphForClient {
+  quests: Array<{ id: string; title: string; status: 'active' | 'completed' | 'failed'; created_at_turn: number }>
+  nodes: Array<{ id: string; quest_id: string; summary: string; hint: string; status: 'completed' | 'active' | 'failed'; turn: number }>
+  edges: Array<{ from_node_id: string; to_node_id: string }>
+}
+
 export type ClientMessage =
   | { type: 'initialize' }
   | { type: 'new_game' }
@@ -42,6 +48,7 @@ export type ClientMessage =
   | { type: 'list_models'; provider: string; api_key: string; base_url?: string }
   | { type: 'get_gameplay_options' }
   | { type: 'set_gameplay_options'; options: Partial<GameplayOptions> }
+  | { type: 'get_quests' }
 
 export type ServerMessage =
   | { type: 'narrative'; text: string; source: string }
@@ -69,6 +76,7 @@ export type ServerMessage =
   | { type: 'llm_test_result'; success: boolean; message: string }
   | { type: 'model_list'; models: string[] }
   | { type: 'no_game' }
+  | { type: 'quest_update'; graph: QuestGraphForClient }
 
 export interface CharacterInfo {
   id: string

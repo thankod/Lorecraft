@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ClientMessage, CharacterInfo, ChoiceForClient, GameplayOptions } from '../types/protocol'
+import type { ClientMessage, CharacterInfo, ChoiceForClient, GameplayOptions, QuestGraphForClient } from '../types/protocol'
 
 export interface NarrativeLine {
   text: string
@@ -104,6 +104,9 @@ interface GameState {
   llmTestResult: { success: boolean; message: string } | null
   llmModels: string[] | null
 
+  // Quest Graph
+  questGraph: QuestGraphForClient | null
+
   // Gameplay Options
   gameplayOptions: GameplayOptions
 
@@ -133,6 +136,7 @@ interface GameState {
   setSettingsOpen: (v: boolean) => void
   setLLMTestResult: (r: { success: boolean; message: string } | null) => void
   setLLMModels: (models: string[] | null) => void
+  setQuestGraph: (graph: QuestGraphForClient | null) => void
   setGameplayOptions: (opts: GameplayOptions) => void
   appendInitLog: (message: string) => void
   resetGame: () => void
@@ -177,6 +181,8 @@ export const useGameStore = create<GameState>((set) => ({
   llmTestResult: null,
   llmModels: null,
 
+  questGraph: null,
+
   gameplayOptions: {
     inner_voice: true,
     insistence: true,
@@ -214,6 +220,7 @@ export const useGameStore = create<GameState>((set) => ({
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setLLMTestResult: (llmTestResult) => set({ llmTestResult }),
   setLLMModels: (llmModels) => set({ llmModels }),
+  setQuestGraph: (questGraph) => set({ questGraph }),
   setGameplayOptions: (gameplayOptions) => set({ gameplayOptions }),
 
   appendInitLog: (message) =>
@@ -236,6 +243,7 @@ export const useGameStore = create<GameState>((set) => ({
       playerInfo: null,
       npcList: [],
       sessionList: null,
+      questGraph: null,
       debugInitLog: [],
       debugTurns: [],
       debugErrors: [],

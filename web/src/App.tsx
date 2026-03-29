@@ -12,6 +12,7 @@ import { tabs } from './tabs/registry'
 // Import tabs so they self-register
 import './tabs/NarrativeTab'
 import './tabs/CharactersTab'
+import './tabs/QuestTab'
 import './tabs/DebugTab'
 import './tabs/SettingsTab'
 

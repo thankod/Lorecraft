@@ -49,6 +49,8 @@ import {
   NarrativeProgressStep,
   EventBroadcastStep,
 } from '../orchestration/steps/event-steps.js'
+import { QuestTrackingStep } from '../orchestration/steps/quest-steps.js'
+import type { QuestGraph } from '../domain/models/quest.js'
 import type { ParsedIntent, InsistenceState, ChoiceOption } from '../domain/models/pipeline-io.js'
 import type { GenesisDocument } from '../domain/models/genesis.js'
 import type { LocationEdge } from '../domain/models/world.js'
@@ -96,6 +98,7 @@ export interface GameEventListener {
   onInitComplete(doc: GenesisDocument): void
   onCharCreate?(attributes: PlayerAttributes, meta: Array<{ id: string; display_name: string; domain: string }>): void
   onDebugTurnStart?(turn: number, input: string): void
+  onQuestUpdate?(graph: QuestGraph): void
   onDebugStep?(step: string, phase: 'start' | 'end', status?: string, duration_ms?: number, data?: string): void
   onDebugState?(states: Record<string, unknown>): void
   onDebugError?(errorContext: DebugErrorContext): void
@@ -387,10 +390,37 @@ export class GameLoop {
       location: this.gameState.currentLocation,
     })
 
+    // Create initial quest graph from genesis data
+    const narrativeStructure = this.gameState.genesisDoc.narrative_structure
+    const worldSetting2 = this.gameState.genesisDoc.world_setting
+    const phases = narrativeStructure.phases ?? []
+
+    const mainTitle = worldSetting2?.core_conflict
+      ?? narrativeStructure.final_goal_description
+      ?? '主线任务'
+    const mainHint = phases[0]?.direction_summary ?? '探索这个世界'
+
+    const initialGraph: QuestGraph = {
+      quests: [{ id: 'main', title: mainTitle, status: 'active', created_at_turn: 0 }],
+      nodes: [{
+        id: 'main_0',
+        quest_id: 'main',
+        summary: narrativeStructure.inciting_event.narrative_text,
+        hint: mainHint,
+        status: 'active',
+        turn: 0,
+      }],
+      edges: [],
+    }
+    await this.stateStore.set('quests:graph', initialGraph)
+
     // Now start the game proper
     this.listener?.onStatus(this.gameState.currentLocation, this.gameState.currentTurn)
     const inciting = this.gameState.genesisDoc.narrative_structure.inciting_event
     this.listener?.onNarrative(inciting.narrative_text, 'inciting_event')
+
+    // Send initial quest graph
+    this.listener?.onQuestUpdate?.(initialGraph)
   }
 
   get isAwaitingCharConfirm(): boolean {
@@ -640,6 +670,12 @@ export class GameLoop {
         if (result.source === 'rejection') {
           await this.writeRejectionToState(result.text)
         }
+
+        // Send quest graph update if available
+        const questGraph = context.data.get('quest_graph') as QuestGraph | undefined
+        if (questGraph) {
+          this.listener?.onQuestUpdate?.(questGraph)
+        }
       }
 
       // Persist insistence state across turns
@@ -810,6 +846,11 @@ export class GameLoop {
     return { player: playerInfo, npcs }
   }
 
+  /** Get current quest graph from state store */
+  async getQuestGraph(): Promise<QuestGraph | null> {
+    return this.stateStore.get<QuestGraph>('quests:graph')
+  }
+
   // ---- Narrative Rail Check ----
 
   private async runNarrativeRailCheck(): Promise<void> {
@@ -960,6 +1001,7 @@ export class GameLoop {
     pipeline.addStep(new EventIdStep())
     pipeline.addStep(new EventWriteStep(this.eventStore))
     pipeline.addStep(new StateWritebackStep(this.stateStore, this.eventStore))
+    pipeline.addStep(new QuestTrackingStep(this.agentRunner, this.stateStore))
     pipeline.addStep(new NarrativeProgressStep(this.agentRunner, this.stateStore))
     pipeline.addStep(new EventBroadcastStep())
 
@@ -1018,6 +1060,12 @@ export class GameLoop {
     this.pendingInsistInput = null
     this.awaitingCharConfirm = false
     this.awaitingStyleSelect = false
+
+    // Send quest graph if available
+    const questGraph = await this.stateStore.get<QuestGraph>('quests:graph')
+    if (questGraph) {
+      this.listener?.onQuestUpdate?.(questGraph)
+    }
 
     return true
   }

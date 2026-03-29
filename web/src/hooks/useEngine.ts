@@ -258,6 +258,10 @@ function createListener(
       store.getState().setCharCreate({ attributes: attributes as unknown as Record<string, number>, meta })
     },
 
+    onQuestUpdate(graph: import('../types/protocol').QuestGraphForClient) {
+      store.getState().setQuestGraph(graph)
+    },
+
     onDebugTurnStart(turn: number, input: string) {
       store.getState().debugTurnStart(turn, input)
     },
@@ -612,6 +616,14 @@ async function handleMessage(
           store.getState().appendNarrative(`[错误] 获取模型列表失败: ${err instanceof Error ? err.message : String(err)}`, 'error')
         }
         break
+
+      case 'get_quests': {
+        const questGraph = await engine.getQuestGraph()
+        if (questGraph) {
+          store.getState().setQuestGraph(questGraph as import('../types/protocol').QuestGraphForClient)
+        }
+        break
+      }
 
       case 'get_gameplay_options':
         store.getState().setGameplayOptions(engine.getGameplayOptions())
