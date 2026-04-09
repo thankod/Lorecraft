@@ -110,22 +110,101 @@
   box-shadow: 0 0 12px rgba(196, 149, 106, 0.3);
 }
 
+/* ── Zoom Controls ── */
+.quest-zoom-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  z-index: 2;
+}
+
+.quest-zoom-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--fg);
+  font-size: 16px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+  flex-shrink: 0;
+}
+
+.quest-zoom-btn:hover {
+  background: var(--bg-hover);
+}
+
+.quest-zoom-btn:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.quest-zoom-slider {
+  width: 80px;
+  height: 4px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.quest-zoom-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+  border: none;
+  cursor: pointer;
+}
+
+.quest-zoom-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+  border: none;
+  cursor: pointer;
+}
+
+.quest-zoom-label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--fg-muted);
+  min-width: 32px;
+  text-align: center;
+}
+
 /* ── Detail Panel ── */
 .quest-detail {
-  height: 120px;
   flex-shrink: 0;
   border-top: 1px solid var(--border);
   padding: 12px var(--space-lg);
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: 160px;
   overflow-y: auto;
 }
 
 .quest-detail-empty {
-  height: 120px;
   flex-shrink: 0;
   border-top: 1px solid var(--border);
+  padding: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -176,7 +255,6 @@
   font-size: 10px;
   color: var(--fg-muted);
   text-align: right;
-  margin-top: auto;
 }
 
 /* ── Empty state (no quests at all) ── */
@@ -192,23 +270,34 @@
 
 /* ── Mobile ── */
 @media (max-width: 600px) {
-  .quest-detail,
-  .quest-detail-empty {
-    height: 80px;
-    padding: 8px 12px;
+  .quest-zoom-controls {
+    bottom: 8px;
+    right: 8px;
+    padding: 3px 6px;
+    gap: 4px;
+  }
+
+  .quest-zoom-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+  }
+
+  .quest-zoom-slider {
+    width: 60px;
+  }
+
+  .quest-detail {
+    padding: 10px 14px;
+    max-height: 140px;
   }
 
   .quest-detail-summary {
     font-size: 13px;
-    line-height: 1.4;
+    line-height: 1.5;
   }
 
   .quest-detail-hint {
     font-size: 12px;
-  }
-
-  .quest-dag-node {
-    /* Larger tap target on touch */
-    min-height: 48px;
   }
 }

@@ -6,6 +6,10 @@ import type { PositionedNode } from './quest-dag-layout'
 import { questColor, resetQuestColors } from './quest-colors'
 import './QuestTab.css'
 
+const ZOOM_MIN = 0.3
+const ZOOM_MAX = 2
+const ZOOM_STEP = 0.15
+
 function QuestTab() {
   const send = useGameStore((s) => s.send)
   const questGraph = useGameStore((s) => s.questGraph)
@@ -16,15 +20,12 @@ function QuestTab() {
   // Pan / zoom state
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
+
+  // Drag state (refs to avoid re-render during drag)
   const dragging = useRef(false)
   const dragStart = useRef({ x: 0, y: 0 })
   const panStart = useRef({ x: 0, y: 0 })
-
-  // Pinch-to-zoom state
-  const pinching = useRef(false)
-  const pinchStartDist = useRef(0)
-  const pinchStartZoom = useRef(1)
-  const pinchMid = useRef({ x: 0, y: 0 })
+  const didMove = useRef(false)
 
   // Refresh quest data on turn change
   useEffect(() => {
@@ -47,12 +48,11 @@ function QuestTab() {
     return computeLayout(questGraph)
   }, [questGraph])
 
-  // Auto-center on first layout or when layout changes significantly
+  // Auto-center on first layout or when node count changes
   const wrapRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!layout || !wrapRef.current) return
     const rect = wrapRef.current.getBoundingClientRect()
-    // Center the graph in the viewport
     setPan({ x: rect.width / 2, y: 40 })
     setZoom(1)
   }, [layout?.nodes.length])
@@ -63,31 +63,55 @@ function QuestTab() {
     return layout.nodes.find(n => n.id === selectedId) ?? null
   }, [selectedId, layout])
 
-  // ── Pan handlers ──
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    // Only pan on left button, and not on a node
-    if (e.button !== 0) return
-    const target = e.target as HTMLElement
-    if (target.closest('[data-node-id]')) return
+  // ── Touch pan (single finger) ──
+  const onTouchStartPan = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return
+    const t = e.touches[0]
     dragging.current = true
-    dragStart.current = { x: e.clientX, y: e.clientY }
+    didMove.current = false
+    dragStart.current = { x: t.clientX, y: t.clientY }
     panStart.current = { ...pan }
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }, [pan])
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
+  const onTouchMovePan = useCallback((e: React.TouchEvent) => {
+    if (!dragging.current || e.touches.length !== 1) return
+    e.preventDefault()
+    const t = e.touches[0]
+    didMove.current = true
+    setPan({
+      x: panStart.current.x + (t.clientX - dragStart.current.x),
+      y: panStart.current.y + (t.clientY - dragStart.current.y),
+    })
+  }, [])
+
+  const onTouchEndPan = useCallback(() => {
+    dragging.current = false
+  }, [])
+
+  // ── Mouse pan (desktop) ──
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return
+    if ((e.target as HTMLElement).closest('[data-node-id]')) return
+    dragging.current = true
+    didMove.current = false
+    dragStart.current = { x: e.clientX, y: e.clientY }
+    panStart.current = { ...pan }
+  }, [pan])
+
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragging.current) return
+    didMove.current = true
     setPan({
       x: panStart.current.x + (e.clientX - dragStart.current.x),
       y: panStart.current.y + (e.clientY - dragStart.current.y),
     })
   }, [])
 
-  const onPointerUp = useCallback(() => {
+  const onMouseUp = useCallback(() => {
     dragging.current = false
   }, [])
 
-  // ── Zoom handler ──
+  // ── Wheel zoom (desktop) ──
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -95,10 +119,9 @@ function QuestTab() {
     const my = e.clientY - rect.top
 
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
-    const newZoom = Math.min(2, Math.max(0.3, zoom * factor))
+    const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom * factor))
     const ratio = newZoom / zoom
 
-    // Adjust pan so zoom centers on mouse position
     setPan(prev => ({
       x: mx - ratio * (mx - prev.x),
       y: my - ratio * (my - prev.y),
@@ -106,46 +129,17 @@ function QuestTab() {
     setZoom(newZoom)
   }, [zoom])
 
-  // ── Touch handlers (pinch-to-zoom) ──
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      e.preventDefault()
-      pinching.current = true
-      dragging.current = false
-      const dx = e.touches[0].clientX - e.touches[1].clientX
-      const dy = e.touches[0].clientY - e.touches[1].clientY
-      pinchStartDist.current = Math.hypot(dx, dy)
-      pinchStartZoom.current = zoom
-      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-      pinchMid.current = {
-        x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left,
-        y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top,
-      }
-    }
-  }, [zoom])
+  // ── Zoom controls (UI buttons) ──
+  const zoomIn = useCallback(() => {
+    setZoom(z => Math.min(ZOOM_MAX, z + ZOOM_STEP))
+  }, [])
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!pinching.current || e.touches.length !== 2) return
-    e.preventDefault()
-    const dx = e.touches[0].clientX - e.touches[1].clientX
-    const dy = e.touches[0].clientY - e.touches[1].clientY
-    const dist = Math.hypot(dx, dy)
-    const scale = dist / pinchStartDist.current
-    const newZoom = Math.min(2, Math.max(0.3, pinchStartZoom.current * scale))
-    const ratio = newZoom / zoom
-    const mx = pinchMid.current.x
-    const my = pinchMid.current.y
-    setPan(prev => ({
-      x: mx - ratio * (mx - prev.x),
-      y: my - ratio * (my - prev.y),
-    }))
-    setZoom(newZoom)
-  }, [zoom])
+  const zoomOut = useCallback(() => {
+    setZoom(z => Math.max(ZOOM_MIN, z - ZOOM_STEP))
+  }, [])
 
-  const onTouchEnd = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length < 2) {
-      pinching.current = false
-    }
+  const onZoomSlider = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setZoom(parseFloat(e.target.value))
   }, [])
 
   // ── Node click ──
@@ -153,10 +147,10 @@ function QuestTab() {
     setSelectedId(prev => prev === nodeId ? null : nodeId)
   }, [])
 
-  // ── Click on empty space → deselect ──
+  // ── Click on empty space → deselect (only if didn't drag) ──
   const onCanvasClick = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement
-    if (!target.closest('[data-node-id]')) {
+    if (didMove.current) return
+    if (!(e.target as HTMLElement).closest('[data-node-id]')) {
       setSelectedId(null)
     }
   }, [])
@@ -175,13 +169,14 @@ function QuestTab() {
       <div
         ref={wrapRef}
         className={`quest-canvas-wrap ${dragging.current ? 'grabbing' : ''}`}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
         onWheel={onWheel}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
+        onTouchStart={onTouchStartPan}
+        onTouchMove={onTouchMovePan}
+        onTouchEnd={onTouchEndPan}
         onClick={onCanvasClick}
       >
         <svg>
@@ -198,7 +193,6 @@ function QuestTab() {
             </marker>
           </defs>
           <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-            {/* Edges */}
             {layout.edges.map((edge, i) => {
               const midY = (edge.from.y + edge.to.y) / 2
               const d = `M ${edge.from.x} ${edge.from.y} Q ${edge.from.x} ${midY}, ${edge.to.x} ${edge.to.y}`
@@ -211,7 +205,6 @@ function QuestTab() {
                 />
               )
             })}
-            {/* Nodes */}
             {layout.nodes.map(node => (
               <foreignObject
                 key={node.id}
@@ -235,6 +228,21 @@ function QuestTab() {
             ))}
           </g>
         </svg>
+        {/* Zoom controls */}
+        <div className="quest-zoom-controls">
+          <button className="quest-zoom-btn" onClick={zoomIn} aria-label="放大">+</button>
+          <input
+            className="quest-zoom-slider"
+            type="range"
+            min={ZOOM_MIN}
+            max={ZOOM_MAX}
+            step={0.05}
+            value={zoom}
+            onChange={onZoomSlider}
+          />
+          <button className="quest-zoom-btn" onClick={zoomOut} aria-label="缩小">&minus;</button>
+          <span className="quest-zoom-label">{Math.round(zoom * 100)}%</span>
+        </div>
       </div>
       <DetailPanel node={selectedNode} quests={questGraph.quests} />
     </div>
