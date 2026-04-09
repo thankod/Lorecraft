@@ -20,6 +20,12 @@ function QuestTab() {
   const dragStart = useRef({ x: 0, y: 0 })
   const panStart = useRef({ x: 0, y: 0 })
 
+  // Pinch-to-zoom state
+  const pinching = useRef(false)
+  const pinchStartDist = useRef(0)
+  const pinchStartZoom = useRef(1)
+  const pinchMid = useRef({ x: 0, y: 0 })
+
   // Refresh quest data on turn change
   useEffect(() => {
     send({ type: 'get_quests' })
@@ -100,6 +106,48 @@ function QuestTab() {
     setZoom(newZoom)
   }, [zoom])
 
+  // ── Touch handlers (pinch-to-zoom) ──
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault()
+      pinching.current = true
+      dragging.current = false
+      const dx = e.touches[0].clientX - e.touches[1].clientX
+      const dy = e.touches[0].clientY - e.touches[1].clientY
+      pinchStartDist.current = Math.hypot(dx, dy)
+      pinchStartZoom.current = zoom
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      pinchMid.current = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top,
+      }
+    }
+  }, [zoom])
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!pinching.current || e.touches.length !== 2) return
+    e.preventDefault()
+    const dx = e.touches[0].clientX - e.touches[1].clientX
+    const dy = e.touches[0].clientY - e.touches[1].clientY
+    const dist = Math.hypot(dx, dy)
+    const scale = dist / pinchStartDist.current
+    const newZoom = Math.min(2, Math.max(0.3, pinchStartZoom.current * scale))
+    const ratio = newZoom / zoom
+    const mx = pinchMid.current.x
+    const my = pinchMid.current.y
+    setPan(prev => ({
+      x: mx - ratio * (mx - prev.x),
+      y: my - ratio * (my - prev.y),
+    }))
+    setZoom(newZoom)
+  }, [zoom])
+
+  const onTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      pinching.current = false
+    }
+  }, [])
+
   // ── Node click ──
   const onNodeClick = useCallback((nodeId: string) => {
     setSelectedId(prev => prev === nodeId ? null : nodeId)
@@ -131,6 +179,9 @@ function QuestTab() {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onWheel={onWheel}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
         onClick={onCanvasClick}
       >
         <svg>

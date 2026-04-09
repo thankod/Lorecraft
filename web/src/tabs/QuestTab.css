@@ -11,6 +11,7 @@
   overflow: hidden;
   position: relative;
   cursor: grab;
+  touch-action: none;
 }
 
 .quest-canvas-wrap.grabbing {
@@ -187,4 +188,27 @@
   color: var(--fg-muted);
   font-size: 13px;
   font-family: var(--font-ui);
+}
+
+/* ── Mobile ── */
+@media (max-width: 600px) {
+  .quest-detail,
+  .quest-detail-empty {
+    height: 80px;
+    padding: 8px 12px;
+  }
+
+  .quest-detail-summary {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .quest-detail-hint {
+    font-size: 12px;
+  }
+
+  .quest-dag-node {
+    /* Larger tap target on touch */
+    min-height: 48px;
+  }
 }
