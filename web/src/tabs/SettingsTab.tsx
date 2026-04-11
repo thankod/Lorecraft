@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useGameStore } from '../stores/useGameStore'
 import { registerTab } from './registry'
 import { PROVIDERS, type ProviderFields, emptyFields, getModelPlaceholder } from '../shared/provider-defs'
+import { THEMES } from '../theme/themes'
 import './SettingsTab.css'
 
 const FONT_SCALE_OPTIONS = [
@@ -37,6 +38,8 @@ function SettingsTab() {
   const gameplayOptions = useGameStore((s) => s.gameplayOptions)
   const debugEnabled = useGameStore((s) => s.debugEnabled)
   const setDebugEnabled = useGameStore((s) => s.setDebugEnabled)
+  const theme = useGameStore((s) => s.theme)
+  const setTheme = useGameStore((s) => s.setTheme)
 
   const [fontScale, setFontScale] = useState(() => {
     const saved = localStorage.getItem('lorecraft:font-scale')
@@ -193,6 +196,28 @@ function SettingsTab() {
             {testResult.success ? '连接成功' : `连接失败: ${testResult.message}`}
           </div>
         )}
+      </div>
+
+      <div className="settings-section">
+        <div className="settings-section-title">主题</div>
+        <div className="theme-cards">
+          {THEMES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className={`theme-card ${theme === t.id ? 'active' : ''}`}
+              onClick={() => setTheme(t.id)}
+            >
+              <div className="theme-card-swatches">
+                <span className="theme-swatch" style={{ background: t.swatch.bg }} />
+                <span className="theme-swatch" style={{ background: t.swatch.accent }} />
+                <span className="theme-swatch" style={{ background: t.swatch.fg }} />
+              </div>
+              <div className="theme-card-name">{t.label}</div>
+              <div className="theme-card-desc">{t.description}</div>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="settings-section">

@@ -35,7 +35,7 @@
 }
 
 .char-sidebar-item.active {
-  background: rgba(196, 149, 106, 0.04);
+  background: rgb(var(--title-rgb) / 0.04);
   border-left-color: var(--title);
 }
 
@@ -58,7 +58,7 @@
 }
 
 .char-sidebar-tag.player {
-  background: rgba(196, 149, 106, 0.12);
+  background: rgb(var(--title-rgb) / 0.12);
   color: var(--title);
 }
 
@@ -142,7 +142,7 @@
 .char-attr-bar-bg {
   flex: 1;
   height: 6px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-tint-1);
   border-radius: 3px;
   overflow: hidden;
 }

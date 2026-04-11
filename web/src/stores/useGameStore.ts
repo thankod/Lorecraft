@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import type { ClientMessage, CharacterInfo, ChoiceForClient, GameplayOptions, QuestGraphForClient } from '../types/protocol'
+import { type ThemeId, DEFAULT_THEME, isThemeId, getNextThemeId } from '../theme/themes'
+import { clearPaletteCache } from '../tabs/quest-colors'
 
 export interface NarrativeLine {
   text: string
@@ -116,6 +118,9 @@ interface GameState {
   debugTurns: DebugTurn[]
   debugErrors: DebugErrorEntry[]
 
+  // Theme
+  theme: ThemeId
+
   // Actions
   setConnectionStatus: (s: GameState['connectionStatus']) => void
   setSend: (fn: (msg: ClientMessage) => void) => void
@@ -145,6 +150,13 @@ interface GameState {
   debugStepEvent: (entry: DebugStepEntry) => void
   debugSetState: (states: Record<string, unknown>) => void
   debugAddError: (entry: DebugErrorEntry) => void
+  setTheme: (t: ThemeId) => void
+  cycleTheme: () => void
+}
+
+function readInitialTheme(): ThemeId {
+  const saved = localStorage.getItem('lorecraft:theme')
+  return isThemeId(saved) ? saved : DEFAULT_THEME
 }
 
 const noop = () => {}
@@ -195,6 +207,8 @@ export const useGameStore = create<GameState>((set) => ({
   debugInitLog: [],
   debugTurns: [],
   debugErrors: [],
+
+  theme: readInitialTheme(),
 
   setConnectionStatus: (connectionStatus) => set({ connectionStatus }),
   setSend: (send) => set({ send }),
@@ -281,4 +295,20 @@ export const useGameStore = create<GameState>((set) => ({
 
   debugAddError: (entry) =>
     set((s) => ({ debugErrors: [...s.debugErrors, entry] })),
+
+  setTheme: (t) => {
+    localStorage.setItem('lorecraft:theme', t)
+    document.documentElement.dataset.theme = t
+    clearPaletteCache()
+    set({ theme: t })
+  },
+
+  cycleTheme: () => {
+    const current = useGameStore.getState().theme
+    const next = getNextThemeId(current)
+    localStorage.setItem('lorecraft:theme', next)
+    document.documentElement.dataset.theme = next
+    clearPaletteCache()
+    set({ theme: next })
+  },
 }))

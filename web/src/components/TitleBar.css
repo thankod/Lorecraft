@@ -60,5 +60,37 @@
 }
 
 .titlebar-action.confirm:hover {
-  background: rgba(184, 74, 74, 0.1);
+  background: rgb(var(--error-rgb) / 0.1);
+}
+
+.titlebar-theme {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--title-dim);
+  cursor: pointer;
+  padding: 0;
+  margin-right: 2px;
+  transition: color var(--duration-fast),
+              border-color var(--duration-fast),
+              background var(--duration-fast),
+              transform var(--duration-fast);
+}
+
+.titlebar-theme:hover {
+  color: var(--title);
+  border-color: var(--border-accent);
+  background: rgb(var(--title-rgb) / 0.06);
+  transform: rotate(20deg);
+}
+
+.titlebar-theme-glyph {
+  font-size: 15px;
+  line-height: 1;
+  font-family: var(--font-ui);
 }

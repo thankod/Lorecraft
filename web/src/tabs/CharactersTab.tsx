@@ -10,11 +10,11 @@ const ATTR_NAMES: Record<string, string> = {
 }
 
 function attrTierColor(val: number): string {
-  if (val > 90) return 'var(--title)'       // tier-4: gold
-  if (val > 60) return 'var(--system)'      // tier-3: green
-  if (val > 30) return 'var(--fg-muted)'    // tier-2: gray
-  if (val > 10) return '#7a6a58'            // tier-1: brown
-  return '#684848'                           // tier-0: dark red
+  if (val > 90) return 'var(--title)'       // tier-4: accent
+  if (val > 60) return 'var(--system)'      // tier-3: system
+  if (val > 30) return 'var(--fg-muted)'    // tier-2: muted
+  if (val > 10) return 'var(--tier-1)'      // tier-1
+  return 'var(--tier-0)'                    // tier-0
 }
 
 function CharactersTab() {

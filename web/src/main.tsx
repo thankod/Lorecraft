@@ -11,6 +11,12 @@ if (savedScale) {
   if (root) root.style.zoom = savedScale
 }
 
+// Restore saved theme before first paint (prevents FOUC)
+const savedTheme = localStorage.getItem('lorecraft:theme')
+if (savedTheme === 'parchment' || savedTheme === 'moonlight' || savedTheme === 'vellum') {
+  document.documentElement.dataset.theme = savedTheme
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

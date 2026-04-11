@@ -13,8 +13,8 @@
   pointer-events: none;
   z-index: 9998;
   background:
-    radial-gradient(ellipse 120% 80% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.38) 100%),
-    radial-gradient(ellipse 40% 30% at 50% 0%, rgba(196, 149, 106, 0.025) 0%, transparent 60%);
+    radial-gradient(ellipse 120% 80% at 50% 50%, transparent 55%, var(--vignette-edge) 100%),
+    radial-gradient(ellipse 40% 30% at 50% 0%, rgb(var(--title-rgb) / 0.025) 0%, transparent 60%);
 }
 
 /* Subtle noise grain texture */

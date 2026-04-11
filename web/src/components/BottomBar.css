@@ -14,7 +14,7 @@
   left: var(--space-md);
   right: var(--space-md);
   height: 1px;
-  background: var(--rule-copper-strong);
+  background: var(--rule-accent-strong);
   pointer-events: none;
 }
 
@@ -78,7 +78,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--title);
-  box-shadow: 0 0 8px rgba(196, 149, 106, 0.6);
+  box-shadow: 0 0 8px rgb(var(--title-rgb) / 0.6);
   animation: candlePulse 1.6s ease-in-out infinite;
 }
 
@@ -117,7 +117,7 @@
   display: inline-block;
   width: 48px;
   height: 1px;
-  background: var(--rule-copper);
+  background: var(--rule-accent);
 }
 
 .suggestion-pills {
@@ -171,8 +171,8 @@
 
 .suggestion-pill:hover {
   border-color: var(--border-accent);
-  background: rgba(196, 149, 106, 0.05);
-  box-shadow: var(--glow-amber-soft);
+  background: rgb(var(--title-rgb) / 0.05);
+  box-shadow: var(--glow-accent-soft);
 }
 
 .suggestion-pill:hover::before {
@@ -180,7 +180,7 @@
 }
 
 .suggestion-pill:active {
-  background: rgba(196, 149, 106, 0.1);
+  background: rgb(var(--title-rgb) / 0.1);
 }
 
 .pill-key {
@@ -191,18 +191,18 @@
   align-items: center;
   justify-content: center;
   border-radius: 3px;
-  background: var(--gradient-amber-soft);
+  background: var(--gradient-accent-soft);
   border: 1px solid var(--border-accent);
   color: var(--title);
   font-size: 10px;
   font-weight: 700;
   font-family: var(--font-mono);
   letter-spacing: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 var(--edge-highlight-sm);
 }
 
 .suggestion-pill:hover .pill-key {
-  background: var(--gradient-amber-hover);
+  background: var(--gradient-accent-hover);
 }
 
 .pill-body {
@@ -233,20 +233,20 @@
 }
 
 .pill-check.chance-high {
-  background: rgba(90, 154, 106, 0.1);
-  border: 1px solid rgba(90, 154, 106, 0.2);
+  background: rgb(var(--system-rgb) / 0.1);
+  border: 1px solid rgb(var(--system-rgb) / 0.2);
   color: var(--system);
 }
 
 .pill-check.chance-mid {
-  background: rgba(184, 154, 64, 0.1);
-  border: 1px solid rgba(184, 154, 64, 0.2);
+  background: rgb(var(--warn-rgb) / 0.1);
+  border: 1px solid rgb(var(--warn-rgb) / 0.2);
   color: var(--warn);
 }
 
 .pill-check.chance-low {
-  background: rgba(184, 74, 74, 0.1);
-  border: 1px solid rgba(184, 74, 74, 0.2);
+  background: rgb(var(--error-rgb) / 0.1);
+  border: 1px solid rgb(var(--error-rgb) / 0.2);
   color: var(--error);
 }
 
@@ -274,7 +274,7 @@
 
 .input-field:focus {
   border-color: var(--border-accent);
-  box-shadow: var(--glow-amber);
+  box-shadow: var(--glow-accent);
 }
 
 .input-field::placeholder {
@@ -299,7 +299,7 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(196, 149, 106, 0.6) 50%,
+    rgb(var(--title-rgb) / 0.6) 50%,
     transparent 100%
   );
   background-size: 40% 100%;
@@ -315,7 +315,7 @@
 
 .send-btn {
   padding: 10px 22px;
-  background: var(--gradient-amber-soft);
+  background: var(--gradient-accent-soft);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-md);
   color: var(--title);
@@ -326,7 +326,7 @@
   text-transform: uppercase;
   cursor: pointer;
   position: relative;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 var(--edge-highlight-sm);
   transition:
     background var(--duration-normal) var(--ease-candle),
     box-shadow var(--duration-normal) var(--ease-candle),
@@ -334,11 +334,11 @@
 }
 
 .send-btn:hover:not(:disabled) {
-  background: var(--gradient-amber-hover);
+  background: var(--gradient-accent-hover);
   color: var(--highlight);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    var(--glow-amber-soft);
+    inset 0 1px 0 var(--edge-highlight-md),
+    var(--glow-accent-soft);
 }
 
 .send-btn:active:not(:disabled) {
@@ -400,14 +400,14 @@
 }
 
 .insist-confirm {
-  background: rgba(184, 74, 74, 0.1);
+  background: rgb(var(--error-rgb) / 0.1);
   color: var(--error);
-  border-color: rgba(184, 74, 74, 0.3);
+  border-color: rgb(var(--error-rgb) / 0.3);
 }
 
 .insist-confirm:hover {
-  background: rgba(184, 74, 74, 0.2);
-  box-shadow: 0 0 14px -2px rgba(184, 74, 74, 0.25);
+  background: rgb(var(--error-rgb) / 0.2);
+  box-shadow: 0 0 14px -2px rgb(var(--error-rgb) / 0.25);
 }
 
 .insist-abandon {

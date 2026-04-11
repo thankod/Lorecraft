@@ -39,12 +39,12 @@ html, body, #root {
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #383838;
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* ── Selection ── */
 ::selection {
-  background: rgba(196, 149, 106, 0.2);
+  background: var(--selection-bg);
   color: var(--input-fg);
 }
 

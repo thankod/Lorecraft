@@ -40,7 +40,7 @@
 .debug-toolbar-btn.active {
   color: var(--title);
   border-color: var(--border-accent);
-  background: rgba(196, 149, 106, 0.04);
+  background: rgb(var(--title-rgb) / 0.04);
 }
 
 .debug-error-badge {
@@ -112,7 +112,7 @@
 }
 
 .debug-turn-header:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-tint-1);
 }
 
 .debug-chevron {
@@ -167,7 +167,7 @@
   font-weight: 600;
   padding: 2px 7px;
   border-radius: 3px;
-  background: rgba(200, 160, 60, 0.12);
+  background: rgb(var(--warn-rgb) / 0.12);
   color: var(--warn);
   animation: pulse 1.5s infinite;
 }
@@ -313,23 +313,23 @@
 }
 
 .debug-step-tag.sc {
-  background: rgba(112, 144, 184, 0.12);
+  background: rgb(var(--voice-rgb) / 0.12);
   color: var(--voice);
 }
 
 .debug-step-tag.err {
-  background: rgba(184, 74, 74, 0.12);
+  background: rgb(var(--error-rgb) / 0.12);
   color: var(--error);
 }
 
 .debug-step-tag.llm {
-  background: rgba(140, 110, 190, 0.12);
-  color: #a088c8;
+  background: color-mix(in srgb, var(--debug-llm) 15%, transparent);
+  color: var(--debug-llm);
 }
 
 .debug-step-tag.ctx {
-  background: rgba(100, 170, 140, 0.12);
-  color: #6aaa8c;
+  background: color-mix(in srgb, var(--debug-ctx) 15%, transparent);
+  color: var(--debug-ctx);
 }
 
 .debug-expand-hint {
@@ -383,7 +383,7 @@
 }
 
 .debug-context-label {
-  color: #6aaa8c;
+  color: var(--debug-ctx);
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;
@@ -411,11 +411,11 @@
 }
 
 .debug-ctx-kv-header:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface-tint-1);
 }
 
 .debug-ctx-key {
-  color: #6aaa8c;
+  color: var(--debug-ctx);
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
@@ -455,7 +455,7 @@
 /* ── LLM Call Card ── */
 .llm-call-card {
   margin: 6px 12px 6px 44px;
-  border: 1px solid rgba(140, 110, 190, 0.15);
+  border: 1px solid color-mix(in srgb, var(--debug-llm) 15%, transparent);
   border-radius: var(--radius-md);
   background: var(--bg);
   overflow: hidden;
@@ -466,13 +466,13 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: rgba(140, 110, 190, 0.04);
+  background: color-mix(in srgb, var(--debug-llm) 4%, transparent);
   font-size: 12px;
 }
 
 .llm-call-badge {
-  background: rgba(140, 110, 190, 0.15);
-  color: #a088c8;
+  background: color-mix(in srgb, var(--debug-llm) 15%, transparent);
+  color: var(--debug-llm);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
@@ -525,8 +525,8 @@
 }
 
 .llm-call-toggle.active {
-  border-color: rgba(140, 110, 190, 0.4);
-  color: #a088c8;
+  border-color: color-mix(in srgb, var(--debug-llm) 40%, transparent);
+  color: var(--debug-llm);
 }
 
 /* ── LLM Messages ── */
@@ -585,7 +585,7 @@
 }
 
 .debug-state-header:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-tint-1);
 }
 
 .debug-state-label {
@@ -758,7 +758,7 @@
   font-size: 11px;
   color: var(--fg-muted);
   padding: 1px 5px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-tint-2);
   border-radius: 3px;
 }
 
@@ -776,12 +776,12 @@
 }
 
 .debug-store-key-item:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface-tint-1);
   color: var(--fg);
 }
 
 .debug-store-key-item.active {
-  background: rgba(196, 149, 106, 0.06);
+  background: rgb(var(--title-rgb) / 0.06);
   color: var(--title);
   border-left: 2px solid var(--title);
 }
@@ -824,7 +824,7 @@
 
 .debug-error-entry {
   margin-bottom: 8px;
-  border: 1px solid rgba(184, 74, 74, 0.2);
+  border: 1px solid rgb(var(--error-rgb) / 0.2);
   border-radius: var(--radius-md);
   overflow: hidden;
 }
@@ -834,13 +834,13 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: rgba(184, 74, 74, 0.04);
+  background: rgb(var(--error-rgb) / 0.04);
   cursor: pointer;
   user-select: none;
 }
 
 .debug-error-header:hover {
-  background: rgba(184, 74, 74, 0.08);
+  background: rgb(var(--error-rgb) / 0.08);
 }
 
 .debug-error-time {
@@ -863,7 +863,7 @@
   font-size: 12px;
   color: var(--fg-muted);
   padding: 2px 7px;
-  background: rgba(184, 74, 74, 0.1);
+  background: rgb(var(--error-rgb) / 0.1);
   border-radius: 3px;
   flex-shrink: 0;
 }
@@ -880,7 +880,7 @@
 
 .debug-error-body {
   padding: 8px 12px;
-  border-top: 1px solid rgba(184, 74, 74, 0.1);
+  border-top: 1px solid rgb(var(--error-rgb) / 0.1);
 }
 
 .debug-error-section {
@@ -925,7 +925,7 @@
   font-size: 13px;
   font-weight: 500;
   background: var(--bg-elevated);
-  border: 1px solid rgba(184, 74, 74, 0.2);
+  border: 1px solid rgb(var(--error-rgb) / 0.2);
   border-radius: 3px;
   color: var(--fg);
   cursor: pointer;
@@ -934,7 +934,7 @@
 
 .debug-error-copy:hover {
   border-color: var(--error);
-  background: rgba(184, 74, 74, 0.06);
+  background: rgb(var(--error-rgb) / 0.06);
 }
 
 /* ── Animations ── */

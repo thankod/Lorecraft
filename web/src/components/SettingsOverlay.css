@@ -105,7 +105,7 @@
 .settings-select:focus,
 .settings-input:focus {
   border-color: var(--border-accent);
-  box-shadow: 0 0 0 3px rgba(196, 149, 106, 0.06);
+  box-shadow: 0 0 0 3px rgb(var(--title-rgb) / 0.06);
 }
 
 .settings-input::placeholder {
@@ -227,7 +227,7 @@
 }
 
 .settings-save-btn:hover:not(:disabled) {
-  background: rgba(196, 149, 106, 0.08);
+  background: rgb(var(--title-rgb) / 0.08);
 }
 
 .settings-save-btn:disabled {
@@ -246,14 +246,14 @@
 }
 
 .settings-test-result.success {
-  background: rgba(90, 154, 106, 0.08);
-  border: 1px solid rgba(90, 154, 106, 0.2);
+  background: rgb(var(--system-rgb) / 0.08);
+  border: 1px solid rgb(var(--system-rgb) / 0.2);
   color: var(--system);
 }
 
 .settings-test-result.fail {
-  background: rgba(184, 74, 74, 0.08);
-  border: 1px solid rgba(184, 74, 74, 0.2);
+  background: rgb(var(--error-rgb) / 0.08);
+  border: 1px solid rgb(var(--error-rgb) / 0.2);
   color: var(--error);
 }
 
@@ -265,8 +265,8 @@
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 500;
-  background: rgba(184, 154, 64, 0.08);
-  border: 1px solid rgba(184, 154, 64, 0.2);
+  background: rgb(var(--warn-rgb) / 0.08);
+  border: 1px solid rgb(var(--warn-rgb) / 0.2);
   color: var(--warn);
 }
 

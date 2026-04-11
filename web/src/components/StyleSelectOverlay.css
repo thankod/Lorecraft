@@ -59,7 +59,7 @@
 
 .style-card:hover {
   border-color: var(--border-accent);
-  background: rgba(196, 149, 106, 0.03);
+  background: rgb(var(--title-rgb) / 0.03);
   transform: translateY(-1px);
 }
 
@@ -98,12 +98,12 @@
 .style-btn-random {
   background: transparent;
   color: var(--highlight);
-  border-color: rgba(212, 168, 106, 0.3);
+  border-color: rgb(var(--title-rgb) / 0.3);
 }
 
 .style-btn-random:hover {
-  background: rgba(212, 168, 106, 0.08);
-  border-color: rgba(212, 168, 106, 0.5);
+  background: rgb(var(--title-rgb) / 0.08);
+  border-color: rgb(var(--title-rgb) / 0.5);
 }
 
 .style-btn-custom {
@@ -133,7 +133,7 @@
 }
 
 .style-btn-confirm:hover:not(:disabled) {
-  background: rgba(196, 149, 106, 0.08);
+  background: rgb(var(--title-rgb) / 0.08);
 }
 
 .style-btn-confirm:disabled {
@@ -179,7 +179,7 @@
 
 .custom-input:focus {
   border-color: var(--border-accent);
-  box-shadow: 0 0 0 3px rgba(196, 149, 106, 0.06);
+  box-shadow: 0 0 0 3px rgb(var(--title-rgb) / 0.06);
 }
 
 .custom-input::placeholder {

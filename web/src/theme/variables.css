@@ -1,40 +1,22 @@
+/* ==============================================================
+   Design tokens
+   --------------------------------------------------------------
+   Structure: theme-independent tokens (fonts, spacing, radii,
+   transitions) live in :root. Theme-specific color tokens are
+   also defined in :root as the `parchment` default, then
+   overridden under [data-theme="moonlight"] and
+   [data-theme="vellum"] blocks.
+
+   Derived accent tokens (--glow-accent, --rule-accent,
+   --gradient-accent-*) reference --title-rgb and therefore
+   adapt automatically to the active theme without being
+   re-declared per block. CSS variables resolve at used-value
+   time on the element, so the inherited --title-rgb wins.
+   ============================================================== */
+
 :root {
-  /* ── Background layers ── */
-  --bg:          #08080a;
-  --bg-panel:    #0e0e12;
-  --bg-input:    #0a0a0e;
-  --bg-elevated: #131318;
-  --bg-hover:    rgba(255, 255, 255, 0.035);
-
-  /* ── Foreground ── */
-  --fg:          #b8b0a8;
-  --fg-muted:    #787068;
-  --input-fg:    #d0c8c0;
-
-  /* ── Borders ── */
-  --border:      #1e1c20;
-  --border-subtle: #161418;
-  --border-accent: rgba(196, 149, 106, 0.25);
-
-  /* ── Accent: Warm Amber / Parchment Gold ── */
-  --title:       #c4956a;
-  --title-dim:   #9a7554;
-  --highlight:   #d4a86a;
-
-  /* ── Semantic colors ── */
-  --narrative:   #c0b8b0;
-  --voice:       #7090b8;
-  --system:      #5a9a6a;
-  --status:      #605848;
-  --error:       #b84a4a;
-  --warn:        #b89a40;
-
-  /* ── Scrollbar ── */
-  --scrollbar-bg:    #0c0c10;
-  --scrollbar-thumb: #2a2828;
-
-  /* ── Typography ── */
-  --font-display:   'Cinzel', 'Noto Serif SC', Georgia, serif;
+  /* ── Typography (theme-independent) ── */
+  --font-display:    'Cinzel', 'Noto Serif SC', Georgia, serif;
   --font-narrative:  'Crimson Pro', 'Noto Serif SC', Georgia, serif;
   --font-ui:         'DM Sans', 'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
   --font-mono:       'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
@@ -51,27 +33,270 @@
   --radius-md: 6px;
   --radius-lg: 10px;
 
-  /* ── Shadows ── */
-  --shadow-overlay: 0 8px 40px rgba(0, 0, 0, 0.6), 0 0 1px rgba(196, 149, 106, 0.1);
-  --shadow-dropdown: 0 6px 20px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 30px rgba(196, 149, 106, 0.06);
-
-  /* ── Candlelight focus glow (shared between inputs, buttons, etc.) ── */
-  --glow-amber: 0 0 0 3px rgba(196, 149, 106, 0.08), 0 0 18px -2px rgba(196, 149, 106, 0.18);
-  --glow-amber-soft: 0 0 14px -2px rgba(196, 149, 106, 0.12);
-
-  /* ── Decorative copper rule (fading hairline) ── */
-  --rule-copper: linear-gradient(90deg, transparent, rgba(196, 149, 106, 0.35), transparent);
-  --rule-copper-strong: linear-gradient(90deg, transparent 2%, rgba(196, 149, 106, 0.55) 50%, transparent 98%);
-
-  /* ── Amber fills for primary actions ── */
-  --gradient-amber-soft: linear-gradient(180deg, rgba(196, 149, 106, 0.14) 0%, rgba(196, 149, 106, 0.04) 100%);
-  --gradient-amber-hover: linear-gradient(180deg, rgba(196, 149, 106, 0.22) 0%, rgba(196, 149, 106, 0.08) 100%);
-
   /* ── Transitions ── */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-candle: cubic-bezier(0.22, 0.61, 0.36, 1);
   --duration-fast: 0.15s;
   --duration-normal: 0.25s;
   --duration-slow: 0.4s;
+
+  /* ============================================================
+     Theme: parchment (default — dark warm candlelit)
+     ============================================================ */
+
+  /* Background layers */
+  --bg:          #08080a;
+  --bg-panel:    #0e0e12;
+  --bg-input:    #0a0a0e;
+  --bg-elevated: #131318;
+  --bg-hover:    rgba(255, 255, 255, 0.035);
+  /* Theme-aware surface tints: raised/hover overlays that invert in light mode */
+  --surface-tint-1: rgba(255, 255, 255, 0.03);  /* faint */
+  --surface-tint-2: rgba(255, 255, 255, 0.05);  /* medium */
+  --surface-tint-3: rgba(255, 255, 255, 0.08);  /* strong */
+  /* Top-edge inset highlight for raised panels */
+  --edge-highlight-sm: rgba(255, 255, 255, 0.04);
+  --edge-highlight-md: rgba(255, 255, 255, 0.06);
+
+  /* Foreground */
+  --fg:          #b8b0a8;
+  --fg-muted:    #787068;
+  --input-fg:    #d0c8c0;
+
+  /* Borders */
+  --border:        #1e1c20;
+  --border-subtle: #161418;
+
+  /* Accent — warm amber / parchment gold */
+  --title:       #c4956a;
+  --title-dim:   #9a7554;
+  --highlight:   #d4a86a;
+  --title-rgb:   196 149 106;
+  --border-accent: rgb(var(--title-rgb) / 0.25);
+
+  /* Semantic colors */
+  --narrative:   #c0b8b0;
+  --voice:       #7090b8;
+  --voice-rgb:   112 144 184;
+  --system:      #5a9a6a;
+  --system-rgb:  90 154 106;
+  --status:      #605848;
+  --error:       #b84a4a;
+  --error-rgb:   184 74 74;
+  --warn:        #b89a40;
+  --warn-rgb:    184 154 64;
+
+  /* Scrollbar */
+  --scrollbar-bg:          #0c0c10;
+  --scrollbar-thumb:       #2a2828;
+  --scrollbar-thumb-hover: #383838;
+
+  /* Shadows */
+  --shadow-overlay:  0 8px 40px rgba(0, 0, 0, 0.6), 0 0 1px rgb(var(--title-rgb) / 0.1);
+  --shadow-dropdown: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --shadow-glow:     0 0 30px rgb(var(--title-rgb) / 0.06);
+
+  /* Selection */
+  --selection-bg: rgb(var(--title-rgb) / 0.2);
+
+  /* Vignette edge (outer darkening of app shell) */
+  --vignette-edge: rgba(0, 0, 0, 0.38);
+
+  /* Quest node status */
+  --quest-completed-bg:     rgb(var(--system-rgb) / 0.12);
+  --quest-completed-border: #7cb87c;
+  --quest-active-bg:        rgb(var(--title-rgb) / 0.10);
+  --quest-failed-bg:        rgb(var(--error-rgb) / 0.14);
+  --quest-failed-border:    #b85c5c;
+  --quest-edge-stroke:      #2a2828;
+
+  /* Quest palette (per-quest assignment) */
+  --quest-palette-0: #c4956a;
+  --quest-palette-1: #5aafa0;
+  --quest-palette-2: #c47a8a;
+  --quest-palette-3: #9a7abf;
+  --quest-palette-4: #6a8ab8;
+  --quest-palette-5: #8a9a5a;
+  --quest-palette-6: #c47a5a;
+  --quest-palette-7: #5aafbf;
+
+  /* Tier colors (CharCreateOverlay, CharactersTab) */
+  --tier-0: #684848;
+  --tier-1: #7a6a58;
+
+  /* Debug panel */
+  --debug-llm: #a088c8;
+  --debug-ctx: #6aaa8c;
+
+  /* Critical outcome accents (NarrativeTab) */
+  --crit-success: #d4a017;
+  --crit-fail:    #8b1a1a;
+
+  /* ============================================================
+     Derived accent tokens (single definition, auto-follows theme)
+     These use --title-rgb which is re-defined per theme block;
+     because CSS variables resolve at used-value time on the
+     element, these automatically reflect the active theme.
+     ============================================================ */
+  --glow-accent:        0 0 0 3px rgb(var(--title-rgb) / 0.08),
+                        0 0 18px -2px rgb(var(--title-rgb) / 0.18);
+  --glow-accent-soft:   0 0 14px -2px rgb(var(--title-rgb) / 0.12);
+  --rule-accent:        linear-gradient(90deg, transparent, rgb(var(--title-rgb) / 0.35), transparent);
+  --rule-accent-strong: linear-gradient(90deg, transparent 2%, rgb(var(--title-rgb) / 0.55) 50%, transparent 98%);
+  --gradient-accent-soft:  linear-gradient(180deg, rgb(var(--title-rgb) / 0.14) 0%, rgb(var(--title-rgb) / 0.04) 100%);
+  --gradient-accent-hover: linear-gradient(180deg, rgb(var(--title-rgb) / 0.22) 0%, rgb(var(--title-rgb) / 0.08) 100%);
+}
+
+/* ==============================================================
+   Theme: moonlight (dark cool — midnight blue-silver)
+   ============================================================== */
+:root[data-theme='moonlight'] {
+  --bg:          #0a0b10;
+  --bg-panel:    #0f1117;
+  --bg-input:    #0b0d13;
+  --bg-elevated: #141622;
+  --bg-hover:    rgba(255, 255, 255, 0.035);
+  --surface-tint-1: rgba(255, 255, 255, 0.035);
+  --surface-tint-2: rgba(255, 255, 255, 0.055);
+  --surface-tint-3: rgba(255, 255, 255, 0.085);
+  --edge-highlight-sm: rgba(255, 255, 255, 0.045);
+  --edge-highlight-md: rgba(255, 255, 255, 0.065);
+
+  --fg:          #b0b4c0;
+  --fg-muted:    #6a6e7c;
+  --input-fg:    #c4c8d4;
+
+  --border:        #1c1e28;
+  --border-subtle: #15171f;
+
+  --title:       #9ab8d8;
+  --title-dim:   #6d8aa8;
+  --highlight:   #b8d4ec;
+  --title-rgb:   154 184 216;
+  --border-accent: rgb(var(--title-rgb) / 0.25);
+
+  --narrative:   #b8bcc8;
+  --voice:       #8888b8;
+  --voice-rgb:   136 136 184;
+  --system:      #7ac0a0;
+  --system-rgb:  122 192 160;
+  --status:      #4a4e5c;
+  --error:       #d06a6a;
+  --error-rgb:   208 106 106;
+  --warn:        #c0a858;
+  --warn-rgb:    192 168 88;
+
+  --scrollbar-bg:          #0b0d13;
+  --scrollbar-thumb:       #2a2c38;
+  --scrollbar-thumb-hover: #3a3c48;
+
+  --shadow-overlay:  0 8px 40px rgba(0, 0, 0, 0.6), 0 0 1px rgb(var(--title-rgb) / 0.12);
+  --shadow-dropdown: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --shadow-glow:     0 0 30px rgb(var(--title-rgb) / 0.08);
+
+  --selection-bg: rgb(var(--title-rgb) / 0.22);
+
+  --vignette-edge: rgba(0, 0, 0, 0.42);
+
+  --quest-completed-bg:     rgb(var(--system-rgb) / 0.12);
+  --quest-completed-border: #7ac0a0;
+  --quest-active-bg:        rgb(var(--title-rgb) / 0.12);
+  --quest-failed-bg:        rgb(var(--error-rgb) / 0.14);
+  --quest-failed-border:    #d06a6a;
+  --quest-edge-stroke:      #2a2c38;
+
+  --quest-palette-0: #9ab8d8;
+  --quest-palette-1: #7ac0a0;
+  --quest-palette-2: #c090c0;
+  --quest-palette-3: #a898d8;
+  --quest-palette-4: #88a0c8;
+  --quest-palette-5: #a0b890;
+  --quest-palette-6: #c09078;
+  --quest-palette-7: #78c0c8;
+
+  --tier-0: #684a4a;
+  --tier-1: #6a6878;
+
+  --debug-llm: #b09ed8;
+  --debug-ctx: #7ac0a0;
+
+  --crit-success: #c8b050;
+  --crit-fail:    #a02828;
+}
+
+/* ==============================================================
+   Theme: vellum (light warm — sunlit parchment)
+   ============================================================== */
+:root[data-theme='vellum'] {
+  --bg:          #f2ead8;
+  --bg-panel:    #ece2cc;
+  --bg-input:    #f6eedc;
+  --bg-elevated: #e4d8bc;
+  --bg-hover:    rgba(0, 0, 0, 0.04);
+  --surface-tint-1: rgba(60, 40, 10, 0.035);
+  --surface-tint-2: rgba(60, 40, 10, 0.06);
+  --surface-tint-3: rgba(60, 40, 10, 0.10);
+  --edge-highlight-sm: rgba(255, 248, 230, 0.6);
+  --edge-highlight-md: rgba(255, 248, 230, 0.85);
+
+  --fg:          #3a2f1f;
+  --fg-muted:    #7a6a50;
+  --input-fg:    #2a2010;
+
+  --border:        #c8b898;
+  --border-subtle: #d8c8a8;
+
+  --title:       #8a5a2a;
+  --title-dim:   #6a4418;
+  --highlight:   #a8703a;
+  --title-rgb:   138 90 42;
+  --border-accent: rgb(var(--title-rgb) / 0.35);
+
+  --narrative:   #3a2f1f;
+  --voice:       #405878;
+  --voice-rgb:   64 88 120;
+  --system:      #3a7a4a;
+  --system-rgb:  58 122 74;
+  --status:      #8a7a5a;
+  --error:       #8a2828;
+  --error-rgb:   138 40 40;
+  --warn:        #8a6820;
+  --warn-rgb:    138 104 32;
+
+  --scrollbar-bg:          #e4d8bc;
+  --scrollbar-thumb:       #b8a888;
+  --scrollbar-thumb-hover: #988868;
+
+  --shadow-overlay:  0 8px 40px rgba(60, 40, 20, 0.25), 0 0 1px rgb(var(--title-rgb) / 0.2);
+  --shadow-dropdown: 0 6px 20px rgba(60, 40, 20, 0.18);
+  --shadow-glow:     0 0 30px rgb(var(--title-rgb) / 0.12);
+
+  --selection-bg: rgb(var(--title-rgb) / 0.25);
+
+  --vignette-edge: rgba(80, 50, 10, 0.12);
+
+  --quest-completed-bg:     rgb(var(--system-rgb) / 0.14);
+  --quest-completed-border: #4a8a4a;
+  --quest-active-bg:        rgb(var(--title-rgb) / 0.12);
+  --quest-failed-bg:        rgb(var(--error-rgb) / 0.12);
+  --quest-failed-border:    #8a3030;
+  --quest-edge-stroke:      #b8a888;
+
+  --quest-palette-0: #8a5a2a;
+  --quest-palette-1: #3a7a6a;
+  --quest-palette-2: #8a3a5a;
+  --quest-palette-3: #6a3a8a;
+  --quest-palette-4: #3a5a8a;
+  --quest-palette-5: #5a7030;
+  --quest-palette-6: #8a4a20;
+  --quest-palette-7: #307a8a;
+
+  --tier-0: #782828;
+  --tier-1: #8a6040;
+
+  --debug-llm: #6a4898;
+  --debug-ctx: #3a7a4a;
+
+  --crit-success: #a88020;
+  --crit-fail:    #6a1010;
 }

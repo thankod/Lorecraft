@@ -127,14 +127,14 @@
 
 .session-delete-btn:hover {
   color: var(--error);
-  background: rgba(184, 74, 74, 0.1);
+  background: rgb(var(--error-rgb) / 0.1);
 }
 
 .session-delete-btn.confirm {
   color: var(--error);
   font-size: 11px;
   font-weight: 600;
-  background: rgba(184, 74, 74, 0.12);
+  background: rgb(var(--error-rgb) / 0.12);
 }
 
 .session-new-btn {
@@ -154,7 +154,7 @@
 }
 
 .session-new-btn:hover {
-  background: rgba(196, 149, 106, 0.04);
+  background: rgb(var(--title-rgb) / 0.04);
   border-color: var(--border-accent);
   color: var(--title);
 }
