@@ -259,7 +259,13 @@ function SettingsTab() {
       </div>
 
       <div className="settings-build-info">
-        Lorecraft v{__BUILD_VERSION__} · {__GIT_HASH__ === 'dev' ? 'dev' : __GIT_HASH__.slice(0, 7)} · {new Date(__BUILD_TIME__).toLocaleString()}
+        <span className="build-brand">Lorecraft</span>
+        <span className="build-sep">·</span>
+        <span>v{__BUILD_VERSION__}</span>
+        <span className="build-sep">·</span>
+        <span>{__GIT_HASH__ === 'dev' ? 'dev' : __GIT_HASH__.slice(0, 7)}</span>
+        <span className="build-sep">·</span>
+        <span>{new Date(__BUILD_TIME__).toLocaleString()}</span>
       </div>
     </div>
   )

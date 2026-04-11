@@ -78,9 +78,9 @@ export function BottomBar() {
         {isProcessing && <span className="status-processing">思考中…</span>}
       </div>
       {retryable ? (
-        <div className="insistence-row">
+        <div className="insistence-row retry">
           <span className="insistence-hint">生成出错，可能是AI输出格式异常。</span>
-          <button className="insist-btn insist-confirm" onClick={handleRetry}>
+          <button className="insist-btn insist-confirm retry-variant" onClick={handleRetry}>
             重试
           </button>
           <button className="insist-btn insist-abandon" onClick={handleSkipRetry}>
@@ -98,7 +98,7 @@ export function BottomBar() {
           </button>
         </div>
       ) : (
-        <div className="input-zone">
+        <div className={`input-zone ${isProcessing ? 'processing' : ''}`}>
           {hasChoices && (
             <div className="suggestions">
               <span className="suggestions-label">建议行动</span>

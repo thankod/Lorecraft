@@ -56,8 +56,22 @@
   --shadow-dropdown: 0 6px 20px rgba(0, 0, 0, 0.5);
   --shadow-glow: 0 0 30px rgba(196, 149, 106, 0.06);
 
+  /* ── Candlelight focus glow (shared between inputs, buttons, etc.) ── */
+  --glow-amber: 0 0 0 3px rgba(196, 149, 106, 0.08), 0 0 18px -2px rgba(196, 149, 106, 0.18);
+  --glow-amber-soft: 0 0 14px -2px rgba(196, 149, 106, 0.12);
+
+  /* ── Decorative copper rule (fading hairline) ── */
+  --rule-copper: linear-gradient(90deg, transparent, rgba(196, 149, 106, 0.35), transparent);
+  --rule-copper-strong: linear-gradient(90deg, transparent 2%, rgba(196, 149, 106, 0.55) 50%, transparent 98%);
+
+  /* ── Amber fills for primary actions ── */
+  --gradient-amber-soft: linear-gradient(180deg, rgba(196, 149, 106, 0.14) 0%, rgba(196, 149, 106, 0.04) 100%);
+  --gradient-amber-hover: linear-gradient(180deg, rgba(196, 149, 106, 0.22) 0%, rgba(196, 149, 106, 0.08) 100%);
+
   /* ── Transitions ── */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-candle: cubic-bezier(0.22, 0.61, 0.36, 1);
   --duration-fast: 0.15s;
   --duration-normal: 0.25s;
+  --duration-slow: 0.4s;
 }
