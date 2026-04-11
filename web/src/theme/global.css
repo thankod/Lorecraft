@@ -16,6 +16,19 @@ html, body, #root {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern", "liga", "calt";
+}
+
+/* Shared label styling — DM Sans uppercase.
+   Ornate display serifs (Cinzel) look rough on Windows at small sizes;
+   use this mixin class or copy the rules for any label ≤12px. */
+.ui-label {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  font-feature-settings: "kern", "liga", "ss01";
 }
 
 /* ── Scrollbar ── */
