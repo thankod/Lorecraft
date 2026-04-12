@@ -32,8 +32,3 @@
   color: var(--title);
   border-bottom-color: var(--title);
 }
-
-.tab-icon {
-  margin-right: 5px;
-  font-size: 13px;
-}

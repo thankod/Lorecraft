@@ -281,6 +281,5 @@ function DetailPanel({
 registerTab({
   id: 'quests',
   label: '任务',
-  icon: '\uD83D\uDCDC',
   component: QuestTab,
 })

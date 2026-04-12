@@ -732,4 +732,4 @@ function ErrorEntry({ error, index }: { error: DebugErrorEntry; index: number })
   )
 }
 
-registerTab({ id: 'debug', label: '调试', icon: '🔧', component: DebugTab })
+registerTab({ id: 'debug', label: '调试', component: DebugTab })

@@ -17,7 +17,6 @@ export function TabBar({ activeTab, onSelect, items }: Props) {
           className={`tab-btn ${t.id === activeTab ? 'active' : ''}`}
           onClick={() => onSelect(t.id)}
         >
-          {t.icon && <span className="tab-icon">{t.icon}</span>}
           {t.label}
         </button>
       ))}
