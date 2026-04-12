@@ -148,6 +148,7 @@ function createListener(
     const PERSIST_TYPES = new Set([
       'narrative', 'voices', 'check', 'choices', 'status', 'init_progress',
       'init_complete', 'char_create', 'error', 'save_result', 'save_error',
+      'player_input',
     ])
     if (PERSIST_TYPES.has(msg.type)) {
       sessionMessagesRef.current.push(msg)
@@ -459,6 +460,7 @@ async function handleMessage(
           return
         }
         store.getState().setChoices(null)
+        sessionMessagesRef.current.push({ type: 'player_input', text: msg.text })
         await engine.processInput(msg.text)
         await engine.saveSessionHistory(sessionMessagesRef.current)
         break
@@ -480,6 +482,7 @@ async function handleMessage(
         const selectedChoice = currentChoices[msg.index]
         store.getState().setChoices(null)
         store.getState().appendNarrative(`> ${selectedChoice.text}`, 'player-input')
+        sessionMessagesRef.current.push({ type: 'player_input', text: selectedChoice.text })
         store.getState().setProcessing(true)
         store.getState().setInputEnabled(false)
         // Pass predetermined check info so AttributeCheckStep uses it directly
@@ -516,6 +519,7 @@ async function handleMessage(
           store.getState().appendNarrative(t('game:error.noPendingAction'), 'error')
           return
         }
+        sessionMessagesRef.current.push({ type: 'player_input', text: t('bottomBar.insistAction'), raw: true })
         await engine.insist()
         break
 
@@ -770,6 +774,9 @@ function replaySingleMessage(msg: any, store: typeof useGameStore) {
       break
     case 'save_error':
       s.appendNarrative(t('game:system.saveFailed', { message: msg.message }), 'error')
+      break
+    case 'player_input':
+      s.appendNarrative(msg.raw ? msg.text : `> ${msg.text}`, 'player-input')
       break
   }
 }
