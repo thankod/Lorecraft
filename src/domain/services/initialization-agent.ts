@@ -66,38 +66,38 @@ export class InitializationAgent {
 
     // Step 1: Load style config
     this.onStep('LoadStyleConfig', 'start')
-    this.onProgress('正在加载风格配置…')
+    this.onProgress('Loading style config…')
     const styleConfig = this.configLoader.getStyleConfig()
     this.onStep('LoadStyleConfig', 'end')
 
     // Step 2: Generate GenesisDocument via LLM
     this.onStep('WorldGenerator', 'start')
-    this.onProgress('正在调用大模型生成世界…')
+    this.onProgress('Calling LLM to generate world…')
     const genesisDoc = await this.generateGenesisDocument(styleConfig)
-    this.onProgress(`世界生成完成 (${((Date.now() - t0) / 1000).toFixed(1)}s)`)
+    this.onProgress(`World generated (${((Date.now() - t0) / 1000).toFixed(1)}s)`)
     this.onStep('WorldGenerator', 'end')
 
     // Step 3: Validation (handled by ResponseParser in step 2)
 
     // Step 4: Persist genesis document
     this.onStep('PersistGenesis', 'start')
-    this.onProgress('正在保存创世文档…')
+    this.onProgress('Saving genesis document…')
     await this.sessionStore.saveGenesis(genesisDoc)
     this.onStep('PersistGenesis', 'end')
 
     // Step 5: Distribute to modules (strict ordering)
     this.onStep('DistributeToModules', 'start')
-    this.onProgress('正在初始化世界状态…')
+    this.onProgress('Initializing world state…')
     await this.distributeToModules(genesisDoc)
     this.onStep('DistributeToModules', 'end')
 
     // Step 6: Broadcast inciting event
     this.onStep('BroadcastIncitingEvent', 'start')
-    this.onProgress('正在生成序幕事件…')
+    this.onProgress('Generating inciting event…')
     await this.broadcastIncitingEvent(genesisDoc)
     this.onStep('BroadcastIncitingEvent', 'end')
 
-    this.onProgress(`初始化完成 (总计 ${((Date.now() - t0) / 1000).toFixed(1)}s)`)
+    this.onProgress(`Initialization complete (${((Date.now() - t0) / 1000).toFixed(1)}s)`)
     return genesisDoc
   }
 
@@ -173,11 +173,10 @@ export class InitializationAgent {
       '- initial_locations: 至少3个，彼此有连接关系',
       '- 至少有一个地点的某条连接为 BLOCKED 或 REQUIRES_EVENT',
       '- inciting_event.location_id 必须是某个地点的id',
-      '- 所有文本内容使用中文',
     ].join('\n')
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      this.onProgress(`大模型调用中… (第 ${attempt + 1}/${maxRetries} 次尝试)${lastError ? ` [上次失败: ${lastError.slice(0, 120)}]` : ''}`)
+      this.onProgress(`LLM call… (attempt ${attempt + 1}/${maxRetries})${lastError ? ` [last error: ${lastError.slice(0, 120)}]` : ''}`)
 
       const systemPrompt = prompts.fill('world_generator', {
         style_config: [
@@ -199,7 +198,7 @@ export class InitializationAgent {
           ],
           { agent_type: 'WorldGenerator' },
         )
-        this.onProgress(`大模型返回 (${((Date.now() - callStart) / 1000).toFixed(1)}s)，正在解析…`)
+        this.onProgress(`LLM responded (${((Date.now() - callStart) / 1000).toFixed(1)}s), parsing…`)
 
         // Pre-process: inject metadata fields and normalize enums
         const preprocessed = this.preprocessLLMOutput(response.content)
@@ -210,18 +209,18 @@ export class InitializationAgent {
           if (validationErrors.length === 0) {
             const npcCount = result.data.characters.tier_a_npcs.length + (result.data.characters.tier_b_npcs?.length ?? 0)
             const locCount = result.data.initial_locations.length
-            this.onProgress(`解析成功: ${npcCount} 个NPC, ${locCount} 个地点, ${result.data.narrative_structure.phases.length} 个叙事阶段`)
+            this.onProgress(`Parsed: ${npcCount} NPCs, ${locCount} locations, ${result.data.narrative_structure.phases.length} narrative phases`)
             return result.data
           }
           lastError = validationErrors.join('; ')
-          this.onProgress(`一致性检查失败: ${lastError}`)
+          this.onProgress(`Consistency check failed: ${lastError}`)
         } else {
           lastError = result.error.message
-          this.onProgress(`JSON解析失败: ${lastError.slice(0, 120)}`)
+          this.onProgress(`JSON parse failed: ${lastError.slice(0, 120)}`)
         }
       } catch (err) {
         lastError = err instanceof Error ? err.message : String(err)
-        this.onProgress(`调用失败: ${lastError.slice(0, 120)}`)
+        this.onProgress(`Call failed: ${lastError.slice(0, 120)}`)
       }
     }
 

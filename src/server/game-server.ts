@@ -256,7 +256,7 @@ export class AppServer implements GameEventListener {
     try {
       msg = ClientMessageSchema.parse(JSON.parse(raw))
     } catch {
-      this.send({ type: 'error', message: '无效的消息格式' })
+      this.send({ type: 'error', message: 'Invalid message format' })
       return
     }
 
@@ -281,7 +281,7 @@ export class AppServer implements GameEventListener {
           return
         }
         if (this.initializing) {
-          this.send({ type: 'init_progress', step: '正在初始化，请稍候…' })
+          this.send({ type: 'init_progress', step: 'Initializing, please wait…' })
           return
         }
         // Check for existing sessions
@@ -303,7 +303,7 @@ export class AppServer implements GameEventListener {
 
       case 'new_game':
         if (this.initialized || this.initializing) {
-          this.send({ type: 'error', message: '游戏已在进行中，请先重置' })
+          this.send({ type: 'error', message: 'Game already in progress, please reset first' })
           return
         }
         await this.gameLoop.initialize()
@@ -311,7 +311,7 @@ export class AppServer implements GameEventListener {
 
       case 'select_style': {
         if (!this.gameLoop.isAwaitingStyleSelect) {
-          this.send({ type: 'error', message: '当前不在风格选择阶段' })
+          this.send({ type: 'error', message: 'Not in style selection phase' })
           return
         }
         const idx = msg.preset_index
@@ -323,14 +323,14 @@ export class AppServer implements GameEventListener {
           const style = STYLE_PRESETS[idx]
           this.startGeneration({ tone: style.tone, complexity: style.complexity, narrative_style: style.narrative_style, player_archetype: style.player_archetype })
         } else {
-          this.send({ type: 'error', message: '无效的预设索引' })
+          this.send({ type: 'error', message: 'Invalid preset index' })
         }
         break
       }
 
       case 'select_style_custom':
         if (!this.gameLoop.isAwaitingStyleSelect) {
-          this.send({ type: 'error', message: '当前不在风格选择阶段' })
+          this.send({ type: 'error', message: 'Not in style selection phase' })
           return
         }
         this.startGeneration({
@@ -343,7 +343,7 @@ export class AppServer implements GameEventListener {
 
       case 'reroll_attributes':
         if (!this.gameLoop.isAwaitingCharConfirm) {
-          this.send({ type: 'error', message: '当前不在角色创建阶段' })
+          this.send({ type: 'error', message: 'Not in character creation phase' })
           return
         }
         this.gameLoop.rerollAttributes()
@@ -351,7 +351,7 @@ export class AppServer implements GameEventListener {
 
       case 'confirm_attributes':
         if (!this.gameLoop.isAwaitingCharConfirm) {
-          this.send({ type: 'error', message: '当前不在角色创建阶段' })
+          this.send({ type: 'error', message: 'Not in character creation phase' })
           return
         }
         try {
@@ -367,7 +367,7 @@ export class AppServer implements GameEventListener {
 
       case 'input':
         if (!this.initialized) {
-          this.send({ type: 'error', message: '游戏尚未初始化' })
+          this.send({ type: 'error', message: 'Game not initialized' })
           return
         }
         await this.gameLoop.processInput(msg.text)
@@ -394,7 +394,7 @@ export class AppServer implements GameEventListener {
 
       case 'insist':
         if (!this.gameLoop.isAwaitingInsist) {
-          this.send({ type: 'error', message: '当前没有待确认的行动' })
+          this.send({ type: 'error', message: 'No pending action to confirm' })
           return
         }
         await this.gameLoop.insist()
@@ -403,7 +403,7 @@ export class AppServer implements GameEventListener {
       case 'abandon':
         if (!this.gameLoop.isAwaitingInsist) return
         this.gameLoop.abandon()
-        this.send({ type: 'narrative', text: '你改变了主意。', source: 'system' })
+        this.send({ type: 'narrative', text: 'You changed your mind.', source: 'system' })
         break
 
       case 'retry':
@@ -415,7 +415,7 @@ export class AppServer implements GameEventListener {
         if (info) {
           this.sendDirect({ type: 'characters', player: info.player, npcs: info.npcs })
         } else {
-          this.send({ type: 'error', message: '游戏尚未初始化' })
+          this.send({ type: 'error', message: 'Game not initialized' })
         }
         break
       }
@@ -445,7 +445,7 @@ export class AppServer implements GameEventListener {
 
         const switched = await this.gameLoop.switchSession(msg.session_id)
         if (!switched) {
-          this.send({ type: 'error', message: '无法切换到该存档' })
+          this.send({ type: 'error', message: 'Cannot switch to that save' })
           return
         }
 
@@ -465,7 +465,7 @@ export class AppServer implements GameEventListener {
           if (gs) {
             this.send({ type: 'init_complete', doc: gs.genesisDoc })
             this.send({ type: 'status', location: gs.currentLocation, turn: gs.currentTurn })
-            this.send({ type: 'narrative', text: `已加载存档：${gs.currentLocation}，回合 ${gs.currentTurn}`, source: 'system' })
+            this.send({ type: 'narrative', text: `Loaded save: ${gs.currentLocation}, Turn ${gs.currentTurn}`, source: 'system' })
           }
         }
         break
@@ -505,7 +505,7 @@ export class AppServer implements GameEventListener {
           this.gameLoop.setProvider(newProvider)
           this.sendDirect({ type: 'llm_config_saved' })
         } catch (err) {
-          this.send({ type: 'error', message: `配置无效: ${err instanceof Error ? err.message : String(err)}` })
+          this.send({ type: 'error', message: `Invalid configuration: ${err instanceof Error ? err.message : String(err)}` })
         }
         break
       }
@@ -529,7 +529,7 @@ export class AppServer implements GameEventListener {
             this.sendDirect({ type: 'model_list', models })
           })
           .catch((err) => {
-            this.send({ type: 'error', message: `获取模型列表失败: ${err instanceof Error ? err.message : String(err)}` })
+            this.send({ type: 'error', message: `Failed to fetch model list: ${err instanceof Error ? err.message : String(err)}` })
           })
         break
     }
@@ -540,7 +540,7 @@ export class AppServer implements GameEventListener {
     try {
       await this.gameLoop.selectStyle(style)
     } catch (err) {
-      this.send({ type: 'error', message: `初始化失败: ${err instanceof Error ? err.message : String(err)}` })
+      this.send({ type: 'error', message: `Initialization failed: ${err instanceof Error ? err.message : String(err)}` })
     } finally {
       this.initializing = false
     }
