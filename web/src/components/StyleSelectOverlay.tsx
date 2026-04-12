@@ -12,6 +12,10 @@ export function StyleSelectOverlay() {
 
   if (!presets) return null
 
+  function handleClose() {
+    useGameStore.getState().setStylePresets(null)
+  }
+
   function selectPreset(index: number) {
     useGameStore.getState().setStylePresets(null)
     send({ type: 'select_style', preset_index: index })
@@ -35,9 +39,12 @@ export function StyleSelectOverlay() {
 
   if (customMode) {
     return (
-      <div className="style-overlay">
+      <div className="style-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose() }}>
         <div className="style-panel">
-          <h2 className="style-title">自定义设定</h2>
+          <div className="style-header">
+            <h2 className="style-title">自定义设定</h2>
+            <button className="style-close-btn" onClick={handleClose}>&#10005;</button>
+          </div>
           <div className="custom-form">
             <label className="custom-label">
               基调与风格 <span className="required">*</span>
@@ -88,9 +95,12 @@ export function StyleSelectOverlay() {
   }
 
   return (
-    <div className="style-overlay">
+    <div className="style-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose() }}>
       <div className="style-panel">
-        <h2 className="style-title">选择世界风格</h2>
+        <div className="style-header">
+          <h2 className="style-title">选择世界风格</h2>
+          <button className="style-close-btn" onClick={handleClose}>&#10005;</button>
+        </div>
         <div className="style-grid">
           {presets.map((p, i) => (
             <button key={i} className="style-card" onClick={() => selectPreset(i)}>

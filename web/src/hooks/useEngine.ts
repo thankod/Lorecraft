@@ -529,8 +529,8 @@ async function handleMessage(
         initializingRef.current = false
         sessionMessagesRef.current = []
         store.getState().resetGame()
-        store.getState().appendNarrative('游戏已重置。', 'system')
-        handleMessage(engine, { type: 'initialize' }, store, sessionMessagesRef, initializingRef, initializedRef)
+        // Directly start a new game (triggers style selection flow)
+        await engine.initialize()
         break
 
       case 'switch_session': {
