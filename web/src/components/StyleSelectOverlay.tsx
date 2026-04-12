@@ -5,6 +5,7 @@ import './StyleSelectOverlay.css'
 
 export function StyleSelectOverlay() {
   const t = useT()
+  const tc = useT('config')
   const presets = useGameStore((s) => s.stylePresets)
   const send = useGameStore((s) => s.send)
   const [customMode, setCustomMode] = useState(false)
@@ -105,9 +106,9 @@ export function StyleSelectOverlay() {
         </div>
         <div className="style-grid">
           {presets.map((p, i) => (
-            <button key={i} className="style-card" onClick={() => selectPreset(i)}>
-              <span className="style-card-label">{p.label}</span>
-              <span className="style-card-desc">{p.description}</span>
+            <button key={p.id || i} className="style-card" onClick={() => selectPreset(i)}>
+              <span className="style-card-label">{tc(`preset.${p.id}.label`, { defaultValue: p.label })}</span>
+              <span className="style-card-desc">{tc(`preset.${p.id}.description`, { defaultValue: p.description })}</span>
             </button>
           ))}
         </div>

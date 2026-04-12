@@ -234,10 +234,10 @@ export class GameLoop {
     this.agentRunner.markTurn(0, '[INITIALIZATION]')
 
     this.configLoader = new ExtensionConfigLoader({ style: this.selectedStyle })
-    this.listener?.onInitProgress(`正在生成游戏世界…`)
+    this.listener?.onInitProgress('Generating game world…')
 
     // Emit debug turn 0 for world generation
-    this.listener?.onDebugTurnStart?.(0, '[世界生成]')
+    this.listener?.onDebugTurnStart?.(0, '[World Generation]')
     const stepTimers = new Map<string, number>()
     const runner = this.agentRunner
     const listener = this.listener
@@ -343,7 +343,7 @@ export class GameLoop {
       }))
       this.listener?.onCharCreate?.(this.pendingAttributes, meta)
     } catch (err) {
-      this.listener?.onError(`初始化失败: ${err instanceof Error ? err.message : String(err)}`)
+      this.listener?.onError(`Initialization failed: ${err instanceof Error ? err.message : String(err)}`)
       throw err
     }
   }
@@ -361,13 +361,13 @@ export class GameLoop {
 
   async confirmAttributes(attributes: PlayerAttributes): Promise<void> {
     if (!this.awaitingCharConfirm || !this.gameState) {
-      this.listener?.onError('当前不在角色创建阶段')
+      this.listener?.onError('Not in character creation phase')
       return
     }
 
     const error = validateAllocation(attributes)
     if (error) {
-      this.listener?.onError(`属性分配无效: ${error}`)
+      this.listener?.onError(`Invalid attribute allocation: ${error}`)
       return
     }
 
@@ -385,7 +385,7 @@ export class GameLoop {
 
     // Create a session record
     const worldSetting = this.gameState.genesisDoc.world_setting
-    const label = worldSetting?.tone ?? '未命名世界'
+    const label = worldSetting?.tone ?? 'Unnamed World'
     this.store.createSession(
       this.gameState.sessionId,
       this.gameState.genesisDoc.id,
@@ -479,7 +479,7 @@ export class GameLoop {
 
   async processInput(playerInput: string, options?: { predeterminedCheck?: { attribute_id: string; difficulty: string } }): Promise<void> {
     if (!this.gameState) {
-      this.listener?.onError('游戏尚未初始化')
+      this.listener?.onError('Game not initialized')
       return
     }
 
@@ -709,7 +709,7 @@ export class GameLoop {
         this.lastInput = playerInput
       }
       this.listener?.onError(
-        `处理失败: ${err instanceof Error ? err.message : String(err)}`,
+        `Processing failed: ${err instanceof Error ? err.message : String(err)}`,
         retryable,
       )
       // Emit debug error context for error replay
@@ -879,7 +879,7 @@ export class GameLoop {
               this.injectionQueueManager.enqueueReflection({
                 id: uuid(),
                 voice_id: 'narrator',
-                content: `[NPC主动行动] ${intervention.action_description}`,
+                content: `[NPC Action] ${intervention.action_description}`,
                 priority: 'HIGH',
                 expiry_turns: 3,
                 created_at_turn: currentTurn,

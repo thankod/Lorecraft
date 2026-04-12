@@ -80,7 +80,7 @@ interface GameState {
   initDoc: any | null
 
   // Style selection
-  stylePresets: Array<{ label: string; description: string }> | null
+  stylePresets: Array<{ id: string; label: string; description: string }> | null
 
   // Character creation
   charCreate: CharCreateState | null
@@ -134,7 +134,7 @@ interface GameState {
   setProcessing: (v: boolean) => void
   setInputEnabled: (v: boolean) => void
   setInitDoc: (doc: any) => void
-  setStylePresets: (presets: Array<{ label: string; description: string }> | null) => void
+  setStylePresets: (presets: Array<{ id: string; label: string; description: string }> | null) => void
   setCharCreate: (state: CharCreateState | null) => void
   setInsistencePrompt: (v: boolean) => void
   setRetryable: (v: boolean) => void

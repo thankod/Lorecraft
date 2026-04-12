@@ -245,8 +245,10 @@ function createListener(
       }
     },
 
-    onStyleSelect(presets: Array<{ label: string; description: string }>) {
-      store.getState().setStylePresets(presets)
+    onStyleSelect(_presets: Array<{ label: string; description: string }>) {
+      store.getState().setStylePresets(
+        STYLE_PRESETS.map(p => ({ id: p.id, label: p.label, description: p.description })),
+      )
     },
 
     onSessionList(sessions: Array<{ id: string; label: string; turn: number; location: string; updated_at: number }>) {
@@ -336,7 +338,7 @@ async function handleMessage(
         }
         if (engine.isAwaitingStyleSelect) {
           store.getState().setStylePresets(
-            STYLE_PRESETS.map(p => ({ label: p.label, description: p.description })),
+            STYLE_PRESETS.map(p => ({ id: p.id, label: p.label, description: p.description })),
           )
           return
         }
