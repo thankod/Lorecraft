@@ -111,7 +111,6 @@ CREATE TABLE IF NOT EXISTS events (
 
 CREATE INDEX IF NOT EXISTS idx_events_turn ON events(turn);
 CREATE INDEX IF NOT EXISTS idx_events_location ON events(location_id);
-CREATE INDEX IF NOT EXISTS idx_events_session_turn ON events(session_id, turn);
 
 -- Event participants (many-to-many)
 CREATE TABLE IF NOT EXISTS event_participants (
@@ -153,7 +152,6 @@ CREATE TABLE IF NOT EXISTS npc_memories (
 
 CREATE INDEX IF NOT EXISTS idx_mem_npc ON npc_memories(npc_id, recorded_at_turn);
 CREATE INDEX IF NOT EXISTS idx_mem_event ON npc_memories(event_id);
-CREATE INDEX IF NOT EXISTS idx_mem_session_npc ON npc_memories(session_id, npc_id, recorded_at_turn);
 
 -- Memory participants (who is mentioned in a memory)
 CREATE TABLE IF NOT EXISTS memory_participants (
@@ -203,7 +201,6 @@ CREATE TABLE IF NOT EXISTS lore (
 
 CREATE INDEX IF NOT EXISTS idx_lore_hash ON lore(content_hash);
 CREATE INDEX IF NOT EXISTS idx_lore_type ON lore(fact_type);
-CREATE INDEX IF NOT EXISTS idx_lore_session_hash ON lore(session_id, content_hash);
 
 -- Lore subjects (many-to-many)
 CREATE TABLE IF NOT EXISTS lore_subjects (
