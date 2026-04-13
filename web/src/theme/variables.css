@@ -225,6 +225,84 @@
 }
 
 /* ==============================================================
+   Theme: hermes (dark teal — cyberpunk warmglow)
+   Inspired by Hermes Agent: deep teal + warm cream/orange accent
+   ============================================================== */
+:root[data-theme='hermes'] {
+  --bg:          #041c1c;
+  --bg-panel:    #07262a;
+  --bg-input:    #052020;
+  --bg-elevated: #0a3034;
+  --bg-hover:    rgba(255, 230, 203, 0.04);
+  --surface-tint-1: rgba(255, 230, 203, 0.03);
+  --surface-tint-2: rgba(255, 230, 203, 0.05);
+  --surface-tint-3: rgba(255, 230, 203, 0.08);
+  --edge-highlight-sm: rgba(255, 230, 203, 0.04);
+  --edge-highlight-md: rgba(255, 230, 203, 0.07);
+
+  --fg:          #c8c0b4;
+  --fg-muted:    #7a7468;
+  --input-fg:    #e0d8cc;
+
+  --border:        #14383a;
+  --border-subtle: #0e2c2e;
+
+  --title:       #ffe6cb;
+  --title-dim:   #c8a882;
+  --highlight:   #ffd4a0;
+  --title-rgb:   255 200 160;
+  --border-accent: rgb(var(--title-rgb) / 0.22);
+
+  --narrative:   #c8c0b4;
+  --voice:       #78b8c8;
+  --voice-rgb:   120 184 200;
+  --system:      #5aaf8a;
+  --system-rgb:  90 175 138;
+  --status:      #5a6858;
+  --error:       #d87070;
+  --error-rgb:   216 112 112;
+  --warn:        #d8b850;
+  --warn-rgb:    216 184 80;
+
+  --scrollbar-bg:          #052020;
+  --scrollbar-thumb:       #1a4044;
+  --scrollbar-thumb-hover: #285058;
+
+  --shadow-overlay:  0 8px 40px rgba(0, 0, 0, 0.65), 0 0 1px rgb(var(--title-rgb) / 0.12);
+  --shadow-dropdown: 0 6px 20px rgba(0, 0, 0, 0.55);
+  --shadow-glow:     0 0 30px rgb(var(--title-rgb) / 0.10);
+
+  --selection-bg: rgb(var(--title-rgb) / 0.20);
+
+  --vignette-edge: rgba(0, 0, 0, 0.45);
+
+  --quest-completed-bg:     rgb(var(--system-rgb) / 0.12);
+  --quest-completed-border: #5aaf8a;
+  --quest-active-bg:        rgb(var(--title-rgb) / 0.10);
+  --quest-failed-bg:        rgb(var(--error-rgb) / 0.14);
+  --quest-failed-border:    #d87070;
+  --quest-edge-stroke:      #1a4044;
+
+  --quest-palette-0: #ffc8a0;
+  --quest-palette-1: #5aafb0;
+  --quest-palette-2: #d89090;
+  --quest-palette-3: #a890d0;
+  --quest-palette-4: #78a8d0;
+  --quest-palette-5: #90b878;
+  --quest-palette-6: #d89868;
+  --quest-palette-7: #68c0b8;
+
+  --tier-0: #584848;
+  --tier-1: #786858;
+
+  --debug-llm: #b898d8;
+  --debug-ctx: #5aaf8a;
+
+  --crit-success: #d8b030;
+  --crit-fail:    #8a2020;
+}
+
+/* ==============================================================
    Theme: vellum (light warm — sunlit parchment)
    ============================================================== */
 :root[data-theme='vellum'] {

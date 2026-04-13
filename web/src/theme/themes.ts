@@ -6,7 +6,7 @@
  * variables.css where hardcoded theme colors are allowed.
  */
 
-export type ThemeId = 'parchment' | 'moonlight' | 'vellum'
+export type ThemeId = 'parchment' | 'moonlight' | 'hermes' | 'vellum'
 
 export interface ThemeMeta {
   id: ThemeId
@@ -41,6 +41,16 @@ export const THEMES: ThemeMeta[] = [
     },
   },
   {
+    id: 'hermes',
+    label: '深渊翠光',
+    description: '深青暗调，暖橙与奶油的辉光',
+    swatch: {
+      bg: '#041c1c',
+      accent: '#ffe6cb',
+      fg: '#c8c0b4',
+    },
+  },
+  {
     id: 'vellum',
     label: '象牙手稿',
     description: '明亮米羊皮纸，焦糖点缀',
@@ -55,7 +65,7 @@ export const THEMES: ThemeMeta[] = [
 export const DEFAULT_THEME: ThemeId = 'parchment'
 
 export function isThemeId(v: unknown): v is ThemeId {
-  return v === 'parchment' || v === 'moonlight' || v === 'vellum'
+  return v === 'parchment' || v === 'moonlight' || v === 'hermes' || v === 'vellum'
 }
 
 export function getThemeMeta(id: ThemeId): ThemeMeta {
