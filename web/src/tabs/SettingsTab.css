@@ -517,9 +517,9 @@
 
 /* ── Theme cards ── */
 .theme-cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
   gap: 10px;
+  overflow-x: auto;
 }
 
 .theme-card {
@@ -527,6 +527,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 14px 14px 12px;
+  flex: 1 0 0;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -585,8 +586,3 @@
   line-height: 1.45;
 }
 
-@media (max-width: 560px) {
-  .theme-cards {
-    grid-template-columns: 1fr;
-  }
-}
