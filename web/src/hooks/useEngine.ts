@@ -69,7 +69,8 @@ function formatCheckLine(msg: any): { line: string; style: string } {
     ? `${msg.base_target}${modStr} → ${msg.target}`
     : `${msg.target}`
   const marginStr = msg.margin != null ? ` (${msg.margin >= 0 ? '+' : ''}${msg.margin})` : ''
-  const line = `\ud83c\udfb2 ${msg.attribute}[${diffLabel}]: d100(${msg.roll}) + ${msg.attribute}(${msg.attribute_value}) = ${msg.total} vs ${targetStr} \u2192 ${result}${marginStr}`
+  const attrLabel = msg.attribute_id ? String(t(`attrName.${msg.attribute_id}`, { defaultValue: msg.attribute })) : msg.attribute
+  const line = `\ud83c\udfb2 ${attrLabel}[${diffLabel}]: d100(${msg.roll}) + ${attrLabel}(${msg.attribute_value}) = ${msg.total} vs ${targetStr} \u2192 ${result}${marginStr}`
   return { line, style }
 }
 
@@ -197,6 +198,7 @@ function createListener(
         const msg = {
           type: 'check' as const,
           attribute: check.attribute_display_name,
+          attribute_id: check.attribute_id,
           difficulty: check.difficulty ?? 'ROUTINE',
           base_target: check.base_target ?? check.target!,
           modifiers: check.modifiers ?? [],

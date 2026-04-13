@@ -46,6 +46,7 @@ function CharCreatePanel({
   send: ReturnType<typeof useGameStore.getState>['send']
 }) {
   const t = useT('charCreate')
+  const tu = useT()
   const [attrs, setAttrs] = useState<Record<string, number>>({ ...charCreate.attributes })
   const [error, setError] = useState<string | null>(null)
 
@@ -77,7 +78,7 @@ function CharCreatePanel({
     for (const m of charCreate.meta) {
       const v = attrs[m.id]
       if (v === undefined || v < 0 || v > 100 || !Number.isInteger(v)) {
-        setError(t('errorInvalid', { name: m.display_name }))
+        setError(t('errorInvalid', { name: tu(`attrName.${m.id}`, { defaultValue: m.display_name }) }))
         return
       }
     }
@@ -97,7 +98,7 @@ function CharCreatePanel({
             <AttrRow
               key={m.id}
               id={m.id}
-              displayName={m.display_name}
+              displayName={tu(`attrName.${m.id}`, { defaultValue: m.display_name }) as string}
               value={attrs[m.id] ?? 0}
               onChange={setAttr}
             />

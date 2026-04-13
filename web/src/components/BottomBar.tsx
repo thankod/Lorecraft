@@ -143,7 +143,7 @@ function ChoicePill({ choice, index, onSelect }: { choice: ChoiceForClient; inde
         {choice.text}
         {check && (
           <span className={`pill-check ${getChanceClass(check.pass_chance)}`}>
-            {check.attribute_display_name} {diffLabel} <span className="pill-chance">{check.pass_chance}%</span>
+            {t(`attrName.${check.attribute_id}`, { defaultValue: check.attribute_display_name })} {diffLabel} <span className="pill-chance">{check.pass_chance}%</span>
           </span>
         )}
       </span>
