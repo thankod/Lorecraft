@@ -3,10 +3,10 @@ import type { QuestGraphForClient } from '../types/protocol'
 type QNode = QuestGraphForClient['nodes'][number]
 type QEdge = QuestGraphForClient['edges'][number]
 
-export const NODE_W = 180
-export const NODE_H = 48
-export const LAYER_GAP = 80
-export const NODE_GAP = 24
+export const NODE_W = 220
+export const NODE_H = 64
+export const LAYER_GAP = 60
+export const NODE_GAP = 28
 
 export interface PositionedNode extends QNode {
   x: number

@@ -56,12 +56,13 @@
 
 /* ── Nodes (foreignObject content) ── */
 .quest-dag-node {
-  width: 180px;
-  height: 48px;
+  width: 220px;
+  height: 64px;
   border-radius: var(--radius-md);
   border: 1.5px solid var(--border);
+  background: var(--bg-panel);
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 0;
   cursor: pointer;
   transition: box-shadow var(--duration-fast), border-color var(--duration-fast);
@@ -75,24 +76,59 @@
 
 /* Quest color bar (left edge) */
 .quest-dag-node-bar {
-  width: 4px;
-  align-self: stretch;
+  width: 5px;
   flex-shrink: 0;
 }
 
-/* Node text */
-.quest-dag-node-label {
+/* Node body (text area) */
+.quest-dag-node-body {
   flex: 1;
-  padding: 4px 10px;
+  min-width: 0;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+/* Node summary text */
+.quest-dag-node-label {
   font-family: var(--font-ui);
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--fg);
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
+/* Active node hint (below summary) */
+.quest-dag-node-hint {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--fg-muted);
+  font-style: italic;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Status icon (right side) */
+.quest-dag-node-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.quest-dag-node-status.s-completed { color: var(--quest-completed-border); }
+.quest-dag-node-status.s-active { color: var(--title); font-size: 8px; }
+.quest-dag-node-status.s-failed { color: var(--quest-failed-border); }
 
 /* Status variants */
 .quest-dag-node.s-completed {
@@ -103,11 +139,6 @@
 .quest-dag-node.s-active {
   background: var(--quest-active-bg);
   border-color: var(--title);
-}
-
-.quest-dag-node.s-active .quest-dag-node-label {
-  font-style: italic;
-  color: var(--fg-muted);
 }
 
 .quest-dag-node.s-failed {
@@ -122,7 +153,8 @@
 
 /* Selected glow */
 .quest-dag-node.selected {
-  box-shadow: 0 0 12px rgb(var(--title-rgb) / 0.3);
+  box-shadow: 0 0 14px rgb(var(--title-rgb) / 0.35);
+  border-color: var(--title);
 }
 
 /* ── Zoom Controls ── */
@@ -208,12 +240,12 @@
 .quest-detail {
   flex-shrink: 0;
   border-top: 1px solid var(--border);
-  padding: 12px var(--space-lg);
+  padding: 14px var(--space-lg);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   min-height: 100px;
-  max-height: 160px;
+  max-height: 180px;
   overflow-y: auto;
 }
 
@@ -237,17 +269,18 @@
 
 .quest-detail-bar {
   width: 4px;
-  height: 16px;
+  height: 18px;
   border-radius: 2px;
   flex-shrink: 0;
 }
 
 .quest-detail-quest-title {
   font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--fg-muted);
-  letter-spacing: 0.3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--title-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .quest-detail-summary {
@@ -264,13 +297,16 @@
   color: var(--fg-muted);
   font-style: italic;
   margin: 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
 }
 
 .quest-detail-turn {
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--fg-muted);
   text-align: right;
+  opacity: 0.7;
 }
 
 /* ── Empty state (no quests at all) ── */

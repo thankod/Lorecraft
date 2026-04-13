@@ -222,8 +222,14 @@ function QuestTab() {
                   onClick={(e) => { e.stopPropagation(); onNodeClick(node.id) }}
                 >
                   <div className="quest-dag-node-bar" style={{ background: questColor(node.quest_id) }} />
-                  <span className="quest-dag-node-label">
-                    {node.status === 'active' ? node.hint : node.summary}
+                  <div className="quest-dag-node-body">
+                    <span className="quest-dag-node-label">{node.summary}</span>
+                    {node.status === 'active' && node.hint && (
+                      <span className="quest-dag-node-hint">{node.hint}</span>
+                    )}
+                  </div>
+                  <span className={`quest-dag-node-status s-${node.status}`}>
+                    {node.status === 'completed' ? '\u2713' : node.status === 'failed' ? '\u2717' : '\u25CF'}
                   </span>
                 </div>
               </foreignObject>
