@@ -535,6 +535,7 @@
               background var(--duration-fast),
               transform var(--duration-fast);
   font-family: var(--font-ui);
+  min-width: 0;
 }
 
 .theme-card:hover {
@@ -573,6 +574,8 @@
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.5px;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .theme-card-desc {
