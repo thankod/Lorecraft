@@ -48,7 +48,7 @@ const DEFAULT_MODELS: Record<AISdkProviderType, string> = {
   gemini: 'gemini-2.5-flash',
   xai: 'grok-4',
   mistral: 'mistral-large-latest',
-  deepseek: 'deepseek-chat',
+  deepseek: 'deepseek-v4-flash',
   groq: 'llama-3.3-70b-versatile',
   cohere: 'command-r-plus',
   perplexity: 'sonar-pro',
@@ -74,7 +74,7 @@ function createModel(options: AISdkProviderOptions): LanguageModel {
         apiKey: options.apiKey,
         baseURL: options.baseURL,
       })
-      return provider(modelId)
+      return provider.chat(modelId)
     }
     case 'gemini': {
       const provider = createGoogleGenerativeAI({ apiKey: options.apiKey })

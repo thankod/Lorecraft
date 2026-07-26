@@ -20,7 +20,7 @@ export const PROVIDERS: ProviderEntry[] = [
   { value: 'gemini',           label: 'Google Gemini',    keyPlaceholder: 'AIza...',    defaultModel: 'gemini-2.5-flash' },
   { value: 'anthropic',        label: 'Anthropic Claude', keyPlaceholder: 'sk-ant-...', defaultModel: 'claude-sonnet-4-20250514' },
   { value: 'openai',           label: 'OpenAI',           keyPlaceholder: 'sk-...',     defaultModel: 'gpt-4o' },
-  { value: 'deepseek',         label: 'DeepSeek',         keyPlaceholder: 'sk-...',     defaultModel: 'deepseek-chat' },
+  { value: 'deepseek',         label: 'DeepSeek',         keyPlaceholder: 'sk-...',     defaultModel: 'deepseek-v4-flash' },
   { value: 'xai',              label: 'xAI Grok',         keyPlaceholder: 'xai-...',    defaultModel: 'grok-4' },
   { value: 'groq',             label: 'Groq',             keyPlaceholder: 'gsk_...',    defaultModel: 'llama-3.3-70b-versatile' },
   { value: 'mistral',          label: 'Mistral AI',                                     defaultModel: 'mistral-large-latest' },

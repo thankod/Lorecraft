@@ -67,7 +67,6 @@ const KNOWN_MODELS: Partial<Record<AISdkProviderType, string[]>> = {
     'mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest',
     'codestral-latest', 'open-mistral-nemo',
   ],
-  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
   groq: [
     'llama-3.3-70b-versatile', 'llama-3.1-8b-instant',
     'mixtral-8x7b-32768', 'gemma2-9b-it',
@@ -88,11 +87,20 @@ export async function listModels(config: Pick<LLMConfig, 'provider' | 'api_key' 
   }
 
   if (config.provider === 'openai_compatible' || config.provider === 'openai') {
-    const baseUrl = config.base_url || 'https://api.openai.com/v1'
+    const baseUrl = (config.base_url || 'https://api.openai.com/v1').replace(/\/+$/, '')
     const res = await fetch(`${baseUrl}/models`, {
       headers: { Authorization: `Bearer ${config.api_key}` },
     })
     if (!res.ok) throw new Error(`OpenAI API error: ${res.status}`)
+    const data = await res.json() as { data?: Array<{ id: string }> }
+    return (data.data ?? []).map(m => m.id).sort()
+  }
+
+  if (config.provider === 'deepseek') {
+    const res = await fetch('https://api.deepseek.com/models', {
+      headers: { Authorization: `Bearer ${config.api_key}` },
+    })
+    if (!res.ok) throw new Error(`DeepSeek API error: ${res.status}`)
     const data = await res.json() as { data?: Array<{ id: string }> }
     return (data.data ?? []).map(m => m.id).sort()
   }
