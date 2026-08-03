@@ -45,6 +45,17 @@ export {
   DEFAULT_COGNITIVE_VOICES,
   DEFAULT_TIER_C_TEMPLATES,
 } from './extension-config.js'
+export {
+  QUICK_ARCHETYPE_DEFAULTS,
+  WORLD_BUILDER_CONFIG,
+  WORLD_PRESETS,
+  applyQuickWorldArchetype,
+  applyWorldPreset,
+  createEmptyWorldDraft,
+  isDraftBasedOnPreset,
+  resolveWorldCreationDraft,
+  worldBriefToStyleConfig,
+} from './world-creation.js'
 export type {
   StyleConfig,
   CognitiveVoiceConfig,

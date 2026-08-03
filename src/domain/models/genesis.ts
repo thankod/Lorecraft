@@ -1,5 +1,8 @@
 import { z } from 'zod/v4'
 import { PlayerAttributesSchema } from './attributes.js'
+import { PlayerGenderSchema } from './player-profile.js'
+import { StoryDriverSchema, StoryPressureSchema } from './story.js'
+import { ResolvedWorldBriefSchema } from './world-creation.js'
 
 // ============================================================
 // Genesis Document Sub-types
@@ -40,6 +43,10 @@ export type NarrativePhase = z.infer<typeof NarrativePhaseSchema>
 export const PlayerCharacterDefinitionSchema = z.object({
   id: z.string(),
   name: z.string(),
+  gender: PlayerGenderSchema.optional(),
+  age: z.string().optional(),
+  role: z.string().optional(),
+  player_notes: z.string().optional(),
   background: z.string(),
   attributes: PlayerAttributesSchema.optional(),
 })
@@ -97,6 +104,9 @@ export const GenesisDocumentSchema = z.object({
   world_setting: z.object({
     background: z.string(),
     tone: z.string(),
+    story_drivers: z.array(StoryDriverSchema).min(1).optional().default(['MYSTERY']),
+    story_pressure: StoryPressureSchema.optional().default('ACTIVE'),
+    creation_brief: ResolvedWorldBriefSchema.optional(),
     core_conflict: z.string().optional(),
     hidden_secrets: z.array(z.string()).optional().default([]),
     factions: z.array(FactionDefinitionSchema).optional().default([]),

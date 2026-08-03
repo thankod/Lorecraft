@@ -10,9 +10,11 @@ import { GameLoop } from '../engine/game-loop.js'
 import type { GameEventListener } from '../engine/game-loop.js'
 import type { GenesisDocument } from '../domain/models/genesis.js'
 import type { PlayerAttributes } from '../domain/models/attributes.js'
+import type { ResolvedWorldBrief, WorldBuilderConfig } from '../domain/models/world-creation.js'
 import type { AttributeCheckResult } from '../orchestration/steps/arbitration-steps.js'
 import { STYLE_PRESETS } from '../domain/services/extension-config.js'
 import type { StyleConfig } from '../domain/services/extension-config.js'
+import { WORLD_BUILDER_CONFIG } from '../domain/services/world-creation.js'
 import { ClientMessageSchema } from './protocol.js'
 import type { ServerMessage } from './protocol.js'
 import { loadLLMConfig, detectEnvConfig, saveLLMConfig, createProviderFromConfig, testLLMConnection, listModels } from './llm-config.js'
@@ -188,8 +190,12 @@ export class AppServer implements GameEventListener {
     this.send({ type: 'init_complete', doc })
   }
 
-  onStyleSelect(presets: Array<{ label: string; description: string }>): void {
+  onStyleSelect(presets: Array<{ id: string; label: string; description: string; story_drivers: string[]; story_pressure: string }>): void {
     this.send({ type: 'style_select', presets })
+  }
+
+  onWorldBuilderConfig(config: WorldBuilderConfig): void {
+    this.send({ type: 'world_builder_config', config })
   }
 
   onInsistencePrompt(): void {
@@ -213,8 +219,17 @@ export class AppServer implements GameEventListener {
     }
   }
 
-  onCharCreate(attributes: PlayerAttributes, meta: Array<{ id: string; display_name: string; domain: string }>): void {
-    this.send({ type: 'char_create', attributes: attributes as unknown as Record<string, number>, attribute_meta: meta })
+  onCharCreate(
+    attributes: PlayerAttributes,
+    meta: Array<{ id: string; display_name: string; domain: string }>,
+    worldBrief: ResolvedWorldBrief | { tone: string; story_drivers: string[]; story_pressure: string },
+  ): void {
+    this.send({
+      type: 'char_create',
+      attributes: attributes as unknown as Record<string, number>,
+      attribute_meta: meta,
+      world_brief: worldBrief,
+    })
   }
 
   onDebugTurnStart(turn: number, input: string): void {
@@ -279,7 +294,10 @@ export class AppServer implements GameEventListener {
           return
         }
         if (this.gameLoop.isAwaitingStyleSelect) {
-          this.sendDirect({ type: 'style_select', presets: STYLE_PRESETS.map(p => ({ label: p.label, description: p.description })) })
+          this.sendDirect({
+            type: 'world_builder_config',
+            config: WORLD_BUILDER_CONFIG,
+          })
           return
         }
         if (this.initializing) {
@@ -320,10 +338,18 @@ export class AppServer implements GameEventListener {
         if (idx === -1) {
           const randomIdx = Math.floor(Math.random() * STYLE_PRESETS.length)
           const style = STYLE_PRESETS[randomIdx]
-          this.startGeneration({ tone: style.tone, complexity: style.complexity, narrative_style: style.narrative_style, player_archetype: style.player_archetype })
+          this.startGeneration({
+            ...style,
+            story_drivers: msg.story_drivers ?? style.story_drivers,
+            story_pressure: msg.story_pressure ?? style.story_pressure,
+          })
         } else if (idx >= 0 && idx < STYLE_PRESETS.length) {
           const style = STYLE_PRESETS[idx]
-          this.startGeneration({ tone: style.tone, complexity: style.complexity, narrative_style: style.narrative_style, player_archetype: style.player_archetype })
+          this.startGeneration({
+            ...style,
+            story_drivers: msg.story_drivers ?? style.story_drivers,
+            story_pressure: msg.story_pressure ?? style.story_pressure,
+          })
         } else {
           this.send({ type: 'error', message: 'Invalid preset index' })
         }
@@ -339,8 +365,25 @@ export class AppServer implements GameEventListener {
           tone: msg.tone,
           complexity: 'MEDIUM',
           narrative_style: msg.narrative_style,
-          player_archetype: msg.player_archetype,
+          player_archetype: '',
+          story_drivers: msg.story_drivers,
+          story_pressure: msg.story_pressure,
         })
+        break
+
+      case 'select_world':
+        if (!this.gameLoop.isAwaitingStyleSelect) {
+          this.send({ type: 'error', message: 'Not in world selection phase' })
+          return
+        }
+        this.initializing = true
+        try {
+          await this.gameLoop.selectWorld(msg.draft)
+        } catch (err) {
+          this.send({ type: 'error', message: `Invalid world draft: ${err instanceof Error ? err.message : String(err)}` })
+        } finally {
+          this.initializing = false
+        }
         break
 
       case 'reroll_attributes':
@@ -357,13 +400,20 @@ export class AppServer implements GameEventListener {
           return
         }
         try {
-          await this.gameLoop.confirmAttributes(msg.attributes as unknown as PlayerAttributes)
+          this.initializing = true
+          const confirmed = await this.gameLoop.confirmAttributes(
+            msg.attributes as unknown as PlayerAttributes,
+            msg.profile,
+          )
+          if (!confirmed) break
           this.initialized = true
           // Remove char_create from history so reconnect won't re-show overlay
           this.sessionMessages = this.sessionMessages.filter((m) => m.type !== 'char_create')
           await this.gameLoop.saveSessionHistory(this.sessionMessages)
         } catch (err) {
           this.send({ type: 'error', message: err instanceof Error ? err.message : String(err) })
+        } finally {
+          this.initializing = false
         }
         break
 

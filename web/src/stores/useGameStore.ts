@@ -3,6 +3,7 @@ import type { ClientMessage, CharacterInfo, ChoiceForClient, GameplayOptions, Qu
 import { type ThemeId, DEFAULT_THEME, isThemeId, getNextThemeId } from '../theme/themes'
 import { type LocaleId, STORAGE_KEY as LOCALE_STORAGE_KEY, readInitialLocale } from '../i18n/locales'
 import { clearPaletteCache } from '../tabs/quest-colors'
+import type { ResolvedWorldBrief, WorldBuilderConfig } from '@engine/domain/models/world-creation'
 
 export interface NarrativeLine {
   text: string
@@ -23,6 +24,19 @@ export interface AttributeMeta {
 export interface CharCreateState {
   attributes: Record<string, number>
   meta: AttributeMeta[]
+  worldBrief: ResolvedWorldBrief | {
+    tone: string
+    story_drivers: string[]
+    story_pressure: string
+  }
+}
+
+export interface StylePresetState {
+  id: string
+  label: string
+  description: string
+  story_drivers: string[]
+  story_pressure: string
 }
 
 export interface SessionEntry {
@@ -80,7 +94,8 @@ interface GameState {
   initDoc: any | null
 
   // Style selection
-  stylePresets: Array<{ id: string; label: string; description: string }> | null
+  stylePresets: StylePresetState[] | null
+  worldBuilderConfig: WorldBuilderConfig | null
 
   // Character creation
   charCreate: CharCreateState | null
@@ -134,7 +149,8 @@ interface GameState {
   setProcessing: (v: boolean) => void
   setInputEnabled: (v: boolean) => void
   setInitDoc: (doc: any) => void
-  setStylePresets: (presets: Array<{ id: string; label: string; description: string }> | null) => void
+  setStylePresets: (presets: StylePresetState[] | null) => void
+  setWorldBuilderConfig: (config: WorldBuilderConfig | null) => void
   setCharCreate: (state: CharCreateState | null) => void
   setInsistencePrompt: (v: boolean) => void
   setRetryable: (v: boolean) => void
@@ -180,6 +196,7 @@ export const useGameStore = create<GameState>((set) => ({
   initDoc: null,
 
   stylePresets: null,
+  worldBuilderConfig: null,
 
   charCreate: null,
 
@@ -232,6 +249,7 @@ export const useGameStore = create<GameState>((set) => ({
   setInputEnabled: (inputEnabled) => set({ inputEnabled }),
   setInitDoc: (initDoc) => set({ initDoc }),
   setStylePresets: (stylePresets) => set({ stylePresets }),
+  setWorldBuilderConfig: (worldBuilderConfig) => set({ worldBuilderConfig }),
   setCharCreate: (charCreate) => set({ charCreate }),
   setInsistencePrompt: (insistencePrompt) => set({ insistencePrompt }),
   setRetryable: (retryable) => set({ retryable }),
@@ -258,6 +276,7 @@ export const useGameStore = create<GameState>((set) => ({
       inputEnabled: false,
       initDoc: null,
       stylePresets: null,
+      worldBuilderConfig: null,
       charCreate: null,
       insistencePrompt: false,
       retryable: false,

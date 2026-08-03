@@ -116,12 +116,18 @@ export class EventGeneratorStep
 
     // Pacing tension control from recent event weights
     const recentWeights = context.data.get('recent_event_weights') as string[] | undefined
+    const storyPressure = context.data.get('story_pressure') as string | undefined
+    const guidanceMode = context.data.get('narrative_guidance_mode') as string | undefined
     let tensionInstruction = ''
-    if (recentWeights && recentWeights.length >= 3) {
+    if (storyPressure === 'CALM') {
+      tensionInstruction = 'STORY PRESSURE (CRITICAL): This is a CALM story. Do not invent danger, antagonists, conspiracies, confrontations, deadlines, or escalating stakes. Let relationships, routine, curiosity, craft, place, and small personal choices be sufficient.'
+    } else if (storyPressure === 'GENTLE') {
+      tensionInstruction = 'STORY PRESSURE: Keep this story gentle. Small uncertainty and interpersonal friction are allowed, but never escalate them into major danger or conflict unless the player explicitly causes it.'
+    } else if (recentWeights && recentWeights.length >= 3) {
       const highTensionCount = recentWeights.filter((w) => w === 'MAJOR' || w === 'SIGNIFICANT').length
       if (highTensionCount >= 3) {
         tensionInstruction = 'TENSION CONTROL (CRITICAL): The last several events have ALL been high-tension (SIGNIFICANT/MAJOR). The story NEEDS a breather. This event MUST be lower intensity — use PRIVATE or MINOR weight. Include character interactions, quiet moments, dialogue, humor, or reflection. Constant high tension is exhausting and bad storytelling. Let the reader breathe before the next climax.'
-      } else if (highTensionCount === 0) {
+      } else if (highTensionCount === 0 && storyPressure !== 'GENTLE') {
         tensionInstruction = 'TENSION NOTE: Recent events have been calm. If the player\'s action warrants it, you may escalate tension.'
       }
     }
@@ -133,7 +139,9 @@ export class EventGeneratorStep
     const beatPlan = context.data.get('beat_plan') as BeatPlan | undefined
 
     let narrativeDirectionInstruction = ''
-    if (narrativePhase) {
+    if (narrativePhase && guidanceMode === 'SUPPORTIVE') {
+      narrativeDirectionInstruction = `OPTIONAL STORY THREAD: The current direction is "${narrativePhase.direction_summary}". Use it only when it fits the player's action naturally. Do not create urgency, opposition, or consequences just to advance it.`
+    } else if (narrativePhase) {
       narrativeDirectionInstruction = `NARRATIVE DIRECTION (IMPORTANT): The story is currently in phase ${(phaseIndex ?? 0) + 1}/${phaseTotal ?? '?'}: "${narrativePhase.description}". The intended direction is: "${narrativePhase.direction_summary}". While respecting player agency, gently weave narrative elements that align with this direction. Introduce relevant characters, clues, or situations that make the player WANT to engage with the main story. Do NOT force it — but do NOT let the story stagnate in aimless scenes either. If the player's action naturally connects to the narrative direction, amplify that connection.`
     }
 
@@ -691,6 +699,11 @@ export class NarrativeProgressStep implements IPipelineStep<EventPipelineData, E
     context: PipelineContext,
   ): Promise<StepResult<EventPipelineData>> {
     if (!context.options.narrative_progress) {
+      return { status: 'continue', data: input }
+    }
+
+    const guidanceMode = await this.stateStore.get<string>('narrative:guidance_mode')
+    if (guidanceMode === 'OPEN') {
       return { status: 'continue', data: input }
     }
 

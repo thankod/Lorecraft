@@ -51,6 +51,8 @@ export class FullContextStep implements IPipelineStep<Action, Action> {
       worldSummary,
       participantStates,
       worldTone,
+      storyPressure,
+      guidanceMode,
       phaseIndex,
       phases,
       beatPlan,
@@ -64,6 +66,8 @@ export class FullContextStep implements IPipelineStep<Action, Action> {
         `participants:states:${characterId}`,
       ),
       this.stateStore.get<string>('world:tone'),
+      this.stateStore.get<string>('world:story_pressure'),
+      this.stateStore.get<string>('narrative:guidance_mode'),
       this.stateStore.get<number>('narrative:current_phase_index'),
       this.stateStore.get<Array<{ phase_id: string; description: string; direction_summary: string }>>('narrative:phases'),
       this.stateStore.get<BeatPlan>('narrative:beat_plan'),
@@ -82,9 +86,11 @@ export class FullContextStep implements IPipelineStep<Action, Action> {
     context.data.set('event_recent_narrative', mem?.recent_narrative?.slice(-5) ?? [])
     context.data.set('event_known_facts', mem?.known_facts?.slice(-10) ?? [])
     context.data.set('world_tone', worldTone ?? '')
+    context.data.set('story_pressure', storyPressure ?? 'ACTIVE')
+    context.data.set('narrative_guidance_mode', guidanceMode ?? 'DIRECTED')
 
     // Narrative phase direction
-    if (phases && phases.length > 0) {
+    if (guidanceMode !== 'OPEN' && phases && phases.length > 0) {
       const idx = Math.min(phaseIndex ?? 0, phases.length - 1)
       context.data.set('narrative_phase', phases[idx])
       context.data.set('narrative_phase_index', idx)
@@ -92,7 +98,7 @@ export class FullContextStep implements IPipelineStep<Action, Action> {
     }
 
     // Beat plan
-    if (beatPlan) {
+    if (guidanceMode !== 'OPEN' && beatPlan) {
       context.data.set('beat_plan', beatPlan)
     }
 

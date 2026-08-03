@@ -92,6 +92,34 @@
   font-size: 13px;
 }
 
+.char-profile-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: -4px 0 20px;
+}
+
+.char-profile-facts div {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.char-profile-facts dt {
+  color: var(--fg-muted);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.char-profile-facts dd {
+  margin: 0;
+  color: var(--fg);
+  font-family: var(--font-narrative);
+  font-size: 13px;
+}
+
 /* ── Sections ── */
 .char-section {
   margin-bottom: 20px;

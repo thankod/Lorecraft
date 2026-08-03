@@ -16,7 +16,11 @@ import type { CharacterDynamicState, MemoryBuffer, CharacterKnowledge } from '..
 import type { LoreEntry } from '../models/lore.js'
 import type { NPCProfile } from '../models/lore.js'
 import type { EventBus } from './event-bus.js'
-import type { ExtensionConfigLoader, StyleConfig } from './extension-config.js'
+import {
+  deriveNarrativeGuidanceMode,
+  type ExtensionConfigLoader,
+  type StyleConfig,
+} from './extension-config.js'
 import { uuid } from '../../utils/uuid.js'
 
 // ============================================================
@@ -134,6 +138,8 @@ export class InitializationAgent {
       '  "world_setting": {',
       '    "background": "string - 世界背景概述（仅限玩家可知的公共信息，禁止透露 hidden_secrets 的内容）",',
       '    "tone": "string - 叙事基调",',
+      '    "story_drivers": ["RELATIONSHIP"|"EXPLORATION"|"GROWTH"|"MYSTERY"|"SURVIVAL"],',
+      '    "story_pressure": "CALM"|"GENTLE"|"ACTIVE"|"INTENSE",',
       '    "core_conflict": "string（可选）- 核心冲突（GM层面）。日常/轻松类剧本可省略",',
       '    "hidden_secrets": ["string array（可选，默认[]）- 隐藏真相，玩家需通过游玩发现"],',
       '    "factions": [（可选，默认[]）{ "id": "string", "name": "string", "description": "string",',
@@ -154,7 +160,9 @@ export class InitializationAgent {
       '    "phases": [{ "phase_id": "string", "description": "string", "direction_summary": "string - 必填" }]',
       '  },',
       '  "characters": {',
-      '    "player_character": { "id": "string", "name": "string", "background": "string - 仅写角色自己知道的事" },',
+      '    "player_character": { "id": "string", "name": "string", "gender": "MALE"|"FEMALE",',
+      '      "age": "string（可选）", "role": "string（可选）", "player_notes": "string（可选）",',
+      '      "background": "string - 仅写角色自己知道的事，必须服从玩家角色约束" },',
       '    "tier_a_npcs": [{ "id": "string", "name": "string", "background": "string",',
       '      "surface_motivation": "string - 表面动机（玩家可观察到的）",',
       '      "deep_motivation": "string（可选）- 深层动机。表里如一的角色可省略",',
@@ -175,9 +183,9 @@ export class InitializationAgent {
       '- 顶层不要包含 "id" 或 "created_at"（自动生成）',
       '- 枚举值必须大写',
       '- tier_a_npcs: 1-7个，每个必须有 initial_relationships（引用的id必须是实际存在的NPC/玩家id，单向关系允许）',
-      '- phases: 至少3个，每个必须有 direction_summary',
+      '- phases: 至少1个，每个必须有 direction_summary；数量与组织方式由故事压力自动决定',
       '- initial_locations: 至少3个，彼此有连接关系',
-      '- 至少有一个地点的某条连接为 BLOCKED 或 REQUIRES_EVENT',
+      '- CALM/GENTLE 世界允许所有地点自然开放，不要为了游戏性硬造封锁',
       '- inciting_event.location_id 必须是某个地点的id',
     ].join('\n')
 
@@ -185,22 +193,16 @@ export class InitializationAgent {
       this.onProgress({ key: 'init.llmCall', params: { attempt: attempt + 1, maxRetries, lastError: lastError ? lastError.slice(0, 120) : '' } })
 
       const systemPrompt = prompts.fill('world_generator', {
-        style_config: [
-          `基调: ${styleConfig.tone}`,
-          `复杂度: ${styleConfig.complexity}`,
-          `叙事风格: ${styleConfig.narrative_style}`,
-          `角色灵感（仅供参考，不可照搬）: ${styleConfig.player_archetype}`,
-        ].join('\n'),
         schema_hint: schemaHint,
-        retry_hint: lastError ? `上一次尝试失败原因: ${lastError}\n请修正这些问题。` : '',
       })
+      const userPayload = this.buildWorldGenerationPayload(styleConfig, lastError)
 
       const callStart = Date.now()
       try {
         const response = await this.agentRunner.run(
           [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: '生成一个新的游戏世界。只输出JSON。' },
+            { role: 'user', content: JSON.stringify(userPayload, null, 2) },
           ],
           { agent_type: 'WorldGenerator' },
         )
@@ -211,6 +213,7 @@ export class InitializationAgent {
 
         const result = this.genesisParser.parse(preprocessed)
         if (result.success) {
+          this.applyCanonicalSetup(result.data, styleConfig)
           const validationErrors = this.validateGenesisConsistency(result.data)
           if (validationErrors.length === 0) {
             const npcCount = result.data.characters.tier_a_npcs.length + (result.data.characters.tier_b_npcs?.length ?? 0)
@@ -231,6 +234,66 @@ export class InitializationAgent {
     }
 
     throw new Error(`WorldGenerator failed after ${maxRetries} attempts: ${lastError}`)
+  }
+
+  private buildWorldGenerationPayload(styleConfig: StyleConfig, lastError: string): Record<string, unknown> {
+    const brief = styleConfig.world_brief
+    const publicWorldBrief = brief
+      ? {
+          schema_version: brief.schema_version,
+          civilization_stage: brief.civilization_stage,
+          world_tradition: brief.world_tradition,
+          primary_stage: brief.primary_stage,
+          social_form: brief.social_form,
+          technology_level: brief.technology_level,
+          supernatural_boundary: brief.supernatural_boundary,
+          themes: brief.themes,
+          mood: brief.mood,
+          custom_requirements: brief.custom_requirements,
+          excluded_content: brief.excluded_content,
+        }
+      : {
+          legacy_tone: styleConfig.tone,
+          legacy_narrative_style: styleConfig.narrative_style,
+          legacy_complexity: styleConfig.complexity,
+          themes: styleConfig.story_drivers,
+        }
+    const runtimeGuidance = brief?.guidance ?? {
+      mode: deriveNarrativeGuidanceMode(styleConfig.story_pressure),
+      pressure: styleConfig.story_pressure,
+      event_sources: styleConfig.story_drivers,
+    }
+
+    return {
+      task: 'Generate a new game world and return JSON only.',
+      public_world_brief: publicWorldBrief,
+      runtime_guidance: runtimeGuidance,
+      player_profile: styleConfig.player_profile ?? null,
+      retry_context: lastError || null,
+    }
+  }
+
+  private applyCanonicalSetup(doc: GenesisDocument, styleConfig: StyleConfig): void {
+    doc.world_setting.story_drivers = [...styleConfig.story_drivers]
+    doc.world_setting.story_pressure = styleConfig.story_pressure
+    if (styleConfig.world_brief) {
+      doc.world_setting.creation_brief = styleConfig.world_brief
+    }
+
+    const profile = styleConfig.player_profile
+    if (!profile) return
+
+    const player = doc.characters.player_character
+    player.gender = profile.gender
+    if (profile.name) player.name = profile.name
+    if (profile.age) player.age = profile.age
+    if (profile.role) player.role = profile.role
+    if (profile.background_seed) {
+      player.player_notes = profile.background_seed
+      if (!player.background.includes(profile.background_seed)) {
+        player.background = `${profile.background_seed}\n${player.background}`
+      }
+    }
   }
 
   /**
@@ -508,6 +571,8 @@ export class InitializationAgent {
 
     // World tone for EventGenerator pacing
     await this.stateStore.set('world:tone', doc.world_setting.tone)
+    await this.stateStore.set('world:story_drivers', doc.world_setting.story_drivers)
+    await this.stateStore.set('world:story_pressure', doc.world_setting.story_pressure)
   }
 
   private async writeCharacterStates(doc: GenesisDocument): Promise<void> {
@@ -587,6 +652,10 @@ export class InitializationAgent {
     await this.stateStore.set('narrative:phases', doc.narrative_structure.phases)
     await this.stateStore.set('narrative:current_phase_index', 0)
     await this.stateStore.set('narrative:final_goal', doc.narrative_structure.final_goal_description ?? '')
+    await this.stateStore.set(
+      'narrative:guidance_mode',
+      deriveNarrativeGuidanceMode(doc.world_setting.story_pressure),
+    )
 
     // Map NPCs to phases (simplified: associate all Tier A NPCs with all phases)
     for (const phase of doc.narrative_structure.phases) {
@@ -599,6 +668,14 @@ export class InitializationAgent {
 
   private async broadcastIncitingEvent(doc: GenesisDocument): Promise<void> {
     const inciting = doc.narrative_structure.inciting_event
+    const pressure = doc.world_setting.story_pressure
+    const openingWeight = pressure === 'CALM'
+      ? 'PRIVATE'
+      : pressure === 'GENTLE'
+        ? 'MINOR'
+        : pressure === 'ACTIVE'
+          ? 'SIGNIFICANT'
+          : 'MAJOR'
 
     const event: Event = {
       id: uuid(),
@@ -606,8 +683,8 @@ export class InitializationAgent {
       timestamp: { day: 0, hour: 0, turn: 0 },
       location_id: inciting.location_id,
       participant_ids: inciting.participant_ids,
-      tags: ['WORLD_CHANGE'],
-      weight: 'MAJOR',
+      tags: pressure === 'CALM' || pressure === 'GENTLE' ? ['DISCOVERY'] : ['WORLD_CHANGE'],
+      weight: openingWeight,
       force_level: 0,
       created_at: Date.now(),
       summary: inciting.description,

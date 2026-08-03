@@ -66,6 +66,19 @@ function CharactersTab() {
             <h2 className="char-detail-name">{selected.name}</h2>
 
             {/* Player: background + attributes */}
+            {isPlayer && (selected.gender || selected.age || selected.role) && (
+              <dl className="char-profile-facts">
+                {selected.gender && (
+                  <div>
+                    <dt>{t('characters.gender')}</dt>
+                    <dd>{t(selected.gender === 'MALE' ? 'characters.genderMale' : 'characters.genderFemale')}</dd>
+                  </div>
+                )}
+                {selected.age && <div><dt>{t('characters.age')}</dt><dd>{selected.age}</dd></div>}
+                {selected.role && <div><dt>{t('characters.role')}</dt><dd>{selected.role}</dd></div>}
+              </dl>
+            )}
+
             {isPlayer && selected.background && (
               <section className="char-section">
                 <h3>{t('characters.background')}</h3>

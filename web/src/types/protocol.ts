@@ -16,6 +16,22 @@ export interface GameplayOptions {
   world_assertion: boolean
 }
 
+export interface PlayerProfileInput {
+  gender: 'MALE' | 'FEMALE'
+  name?: string
+  age?: string
+  role?: string
+  background_seed?: string
+}
+
+export interface LegacyWorldBriefForClient {
+  tone: string
+  story_drivers: string[]
+  story_pressure: string
+}
+
+export type WorldBriefForClient = ResolvedWorldBrief | LegacyWorldBriefForClient
+
 export interface QuestGraphForClient {
   quests: Array<{ id: string; title: string; status: 'active' | 'completed' | 'failed'; created_at_turn: number }>
   nodes: Array<{ id: string; quest_id: string; summary: string; hint: string; status: 'completed' | 'active' | 'failed'; turn: number }>
@@ -30,13 +46,14 @@ export type ClientMessage =
   | { type: 'save' }
   | { type: 'ping' }
   | { type: 'reroll_attributes' }
-  | { type: 'confirm_attributes'; attributes: Record<string, number> }
+  | { type: 'confirm_attributes'; attributes: Record<string, number>; profile: PlayerProfileInput }
   | { type: 'reset' }
   | { type: 'insist' }
   | { type: 'abandon' }
   | { type: 'retry' }
-  | { type: 'select_style'; preset_index: number }
-  | { type: 'select_style_custom'; tone: string; narrative_style: string; player_archetype: string }
+  | { type: 'select_world'; draft: WorldCreationDraft }
+  | { type: 'select_style'; preset_index: number; story_drivers?: string[]; story_pressure?: string }
+  | { type: 'select_style_custom'; tone: string; narrative_style: string; story_drivers: string[]; story_pressure: string }
   | { type: 'get_characters' }
   | { type: 'list_sessions' }
   | { type: 'new_session' }
@@ -58,7 +75,7 @@ export type ServerMessage =
   | { type: 'error'; message: string; retryable?: boolean }
   | { type: 'init_progress'; step: string }
   | { type: 'init_complete'; doc: any }
-  | { type: 'char_create'; attributes: Record<string, number>; attribute_meta: Array<{ id: string; display_name: string; domain: string }> }
+  | { type: 'char_create'; attributes: Record<string, number>; attribute_meta: Array<{ id: string; display_name: string; domain: string }>; world_brief: WorldBriefForClient }
   | { type: 'save_result'; saveId: string }
   | { type: 'save_error'; message: string }
   | { type: 'pong' }
@@ -68,7 +85,8 @@ export type ServerMessage =
   | { type: 'reset_complete' }
   | { type: 'history'; messages: ServerMessage[] }
   | { type: 'insistence_prompt' }
-  | { type: 'style_select'; presets: Array<{ label: string; description: string }> }
+  | { type: 'style_select'; presets: Array<{ id: string; label: string; description: string; story_drivers: string[]; story_pressure: string }> }
+  | { type: 'world_builder_config'; config: WorldBuilderConfig }
   | { type: 'session_list'; sessions: Array<{ id: string; label: string; turn: number; location: string; updated_at: number }> }
   | { type: 'characters'; player: CharacterInfo; npcs: CharacterInfo[] }
   | { type: 'llm_config'; config: { provider: string; api_key: string; model: string; base_url?: string } }
@@ -82,6 +100,9 @@ export interface CharacterInfo {
   id: string
   name: string
   background?: string
+  gender?: 'MALE' | 'FEMALE'
+  age?: string
+  role?: string
   attributes?: Record<string, number>
   // NPC knowledge fields
   first_impression?: string
@@ -91,3 +112,8 @@ export interface CharacterInfo {
   last_seen_emotion?: string
   last_interaction_turn?: number
 }
+import type {
+  ResolvedWorldBrief,
+  WorldBuilderConfig,
+  WorldCreationDraft,
+} from '@engine/domain/models/world-creation'

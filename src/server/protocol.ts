@@ -1,5 +1,12 @@
 import { z } from 'zod/v4'
 import { PlayerAttributesSchema } from '../domain/models/attributes.js'
+import { PlayerProfileInputSchema } from '../domain/models/player-profile.js'
+import { StoryDriverSchema, StoryPressureSchema } from '../domain/models/story.js'
+import {
+  WorldCreationDraftSchema,
+  type ResolvedWorldBrief,
+  type WorldBuilderConfig,
+} from '../domain/models/world-creation.js'
 
 // ============================================================
 // Client → Server messages
@@ -12,17 +19,31 @@ export const ClientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('save') }),
   z.object({ type: z.literal('ping') }),
   z.object({ type: z.literal('reroll_attributes') }),
-  z.object({ type: z.literal('confirm_attributes'), attributes: PlayerAttributesSchema }),
+  z.object({
+    type: z.literal('confirm_attributes'),
+    attributes: PlayerAttributesSchema,
+    profile: PlayerProfileInputSchema,
+  }),
   z.object({ type: z.literal('reset') }),
   z.object({ type: z.literal('insist') }),
   z.object({ type: z.literal('abandon') }),
   z.object({ type: z.literal('retry') }),
-  z.object({ type: z.literal('select_style'), preset_index: z.number().int().min(-1) }),
+  z.object({
+    type: z.literal('select_world'),
+    draft: WorldCreationDraftSchema,
+  }),
+  z.object({
+    type: z.literal('select_style'),
+    preset_index: z.number().int().min(-1),
+    story_drivers: z.array(StoryDriverSchema).min(1).optional(),
+    story_pressure: StoryPressureSchema.optional(),
+  }),
   z.object({
     type: z.literal('select_style_custom'),
     tone: z.string().min(1),
     narrative_style: z.string().min(1),
-    player_archetype: z.string().min(1),
+    story_drivers: z.array(StoryDriverSchema).min(1),
+    story_pressure: StoryPressureSchema,
   }),
   // Character info
   z.object({ type: z.literal('get_characters') }),
@@ -69,7 +90,7 @@ export type ServerMessage =
   | { type: 'error'; message: string; retryable?: boolean }
   | { type: 'init_progress'; step: string }
   | { type: 'init_complete'; doc: unknown }
-  | { type: 'char_create'; attributes: Record<string, number>; attribute_meta: Array<{ id: string; display_name: string; domain: string }> }
+  | { type: 'char_create'; attributes: Record<string, number>; attribute_meta: Array<{ id: string; display_name: string; domain: string }>; world_brief: CharacterWorldBriefForClient }
   | { type: 'save_result'; saveId: string }
   | { type: 'save_error'; message: string }
   | { type: 'pong' }
@@ -79,7 +100,8 @@ export type ServerMessage =
   | { type: 'reset_complete' }
   | { type: 'history'; messages: ServerMessage[] }
   | { type: 'insistence_prompt' }
-  | { type: 'style_select'; presets: Array<{ label: string; description: string }> }
+  | { type: 'style_select'; presets: StylePresetForClient[] }
+  | { type: 'world_builder_config'; config: WorldBuilderConfig }
   | { type: 'session_list'; sessions: Array<{ id: string; label: string; turn: number; location: string; updated_at: number }> }
   | { type: 'characters'; player: CharacterInfo; npcs: CharacterInfo[] }
   | { type: 'llm_config'; config: { provider: string; api_key: string; model: string; base_url?: string } }
@@ -92,6 +114,9 @@ export interface CharacterInfo {
   id: string
   name: string
   background?: string
+  gender?: 'MALE' | 'FEMALE'
+  age?: string
+  role?: string
   attributes?: Record<string, number>
   // NPC knowledge fields
   first_impression?: string
@@ -101,3 +126,19 @@ export interface CharacterInfo {
   last_seen_emotion?: string
   last_interaction_turn?: number
 }
+
+export interface StylePresetForClient {
+  id: string
+  label: string
+  description: string
+  story_drivers: string[]
+  story_pressure: string
+}
+
+export interface WorldBriefForClient {
+  tone: string
+  story_drivers: string[]
+  story_pressure: string
+}
+
+export type CharacterWorldBriefForClient = ResolvedWorldBrief | WorldBriefForClient

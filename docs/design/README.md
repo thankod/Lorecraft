@@ -70,3 +70,4 @@
 | [07 初始化流程](./07_initialization_flow/README.md) | 初始化 Pipeline、创世文档 Schema、分发机制 |
 | [08 错误处理](./08_error_handling/README.md) | 阻塞式重试、错误分类、日志策略 |
 | [09 可扩展性](./09_extensibility/README.md) | 框架扩展点、游戏作者接口 |
+| [10 双层世界观生成器](./10_world_creation/README.md) | 快速生成、详细定制、常见预设、世界简报与初始化衔接 |

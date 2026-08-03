@@ -8,7 +8,17 @@ import type { NarrativeOutput, GameplayOptions } from '../orchestration/pipeline
 import { DEFAULT_GAMEPLAY_OPTIONS } from '../orchestration/pipeline/types.js'
 import { InitializationAgent, type ProgressMessage } from '../domain/services/initialization-agent.js'
 import { SaveLoadSystem } from '../domain/services/save-load-system.js'
-import { ExtensionConfigLoader, STYLE_PRESETS, type StyleConfig } from '../domain/services/extension-config.js'
+import {
+  ExtensionConfigLoader,
+  STYLE_PRESETS,
+  deriveNarrativeGuidanceMode,
+  type StyleConfig,
+} from '../domain/services/extension-config.js'
+import {
+  WORLD_BUILDER_CONFIG,
+  resolveWorldCreationDraft,
+  worldBriefToStyleConfig,
+} from '../domain/services/world-creation.js'
 import { InMemoryInjectionQueueManager } from '../domain/services/injection-queue-manager.js'
 import { SignalProcessor } from '../domain/services/signal-processor.js'
 import { LocationGraph } from '../domain/services/location-graph.js'
@@ -54,6 +64,15 @@ import type { ParsedIntent, InsistenceState, ChoiceOption } from '../domain/mode
 import type { GenesisDocument } from '../domain/models/genesis.js'
 import type { LocationEdge } from '../domain/models/world.js'
 import type { PlayerAttributes } from '../domain/models/attributes.js'
+import {
+  PlayerProfileInputSchema,
+  type PlayerProfileInput,
+} from '../domain/models/player-profile.js'
+import type {
+  ResolvedWorldBrief,
+  WorldBuilderConfig,
+  WorldCreationDraft,
+} from '../domain/models/world-creation.js'
 import { randomAllocate, validateAllocation, ATTRIBUTE_IDS, ATTRIBUTE_META, type PlayerAttributes as PlayerAttrs } from '../domain/models/attributes.js'
 import { uuid } from '../utils/uuid.js'
 
@@ -91,11 +110,16 @@ export interface GameEventListener {
   onChoices?(choices: ChoiceForClient[]): void
   onStatus(location: string, turn: number): void
   onError(message: string, retryable?: boolean): void
-  onStyleSelect?(presets: Array<{ label: string; description: string }>): void
+  onStyleSelect?(presets: Array<{ id: string; label: string; description: string; story_drivers: string[]; story_pressure: string }>): void
+  onWorldBuilderConfig?(config: WorldBuilderConfig): void
   onSessionList?(sessions: Array<{ id: string; label: string; turn: number; location: string; updated_at: number }>): void
   onInitProgress(step: string | ProgressMessage): void
   onInitComplete(doc: GenesisDocument): void
-  onCharCreate?(attributes: PlayerAttributes, meta: Array<{ id: string; display_name: string; domain: string }>): void
+  onCharCreate?(
+    attributes: PlayerAttributes,
+    meta: Array<{ id: string; display_name: string; domain: string }>,
+    worldBrief: ResolvedWorldBrief | { tone: string; story_drivers: string[]; story_pressure: string },
+  ): void
   onDebugTurnStart?(turn: number, input: string): void
   onQuestUpdate?(graph: QuestGraph): void
   onDebugStep?(step: string, phase: 'start' | 'end', status?: string, duration_ms?: number, data?: string): void
@@ -208,11 +232,9 @@ export class GameLoop {
   }
 
   async initialize(): Promise<void> {
-    // Send style presets to client and wait for selection
+    // Send the server-authoritative world builder catalog and wait for selection.
     this.awaitingStyleSelect = true
-    this.listener?.onStyleSelect?.(
-      STYLE_PRESETS.map((p) => ({ label: p.label, description: p.description })),
-    )
+    this.listener?.onWorldBuilderConfig?.(WORLD_BUILDER_CONFIG)
   }
 
   get isAwaitingStyleSelect(): boolean {
@@ -223,16 +245,51 @@ export class GameLoop {
   async selectStyle(style: StyleConfig): Promise<void> {
     this.awaitingStyleSelect = false
     this.selectedStyle = style
-    await this.generateWorld()
+    this.beginCharacterCreation()
   }
 
-  private async generateWorld(): Promise<void> {
+  /** Resolve a user-authored world draft before moving to character creation. */
+  async selectWorld(draft: WorldCreationDraft): Promise<void> {
+    const brief = resolveWorldCreationDraft(draft)
+    await this.selectStyle(worldBriefToStyleConfig(brief))
+  }
+
+  private beginCharacterCreation(): void {
+    if (!this.selectedStyle) return
+    this.pendingAttributes = randomAllocate()
+    this.awaitingCharConfirm = true
+    this.emitCharacterCreation()
+  }
+
+  private emitCharacterCreation(): void {
+    if (!this.pendingAttributes || !this.selectedStyle) return
+    const meta = ATTRIBUTE_IDS.map((id) => ({
+      id,
+      display_name: ATTRIBUTE_META[id].display_name,
+      domain: ATTRIBUTE_META[id].domain,
+    }))
+    const worldBrief = this.selectedStyle.world_brief ?? {
+      tone: this.selectedStyle.tone,
+      story_drivers: [...this.selectedStyle.story_drivers],
+      story_pressure: this.selectedStyle.story_pressure,
+    }
+    this.listener?.onCharCreate?.(this.pendingAttributes, meta, worldBrief)
+  }
+
+  private async generateWorld(
+    attributes: PlayerAttributes,
+    profile: PlayerProfileInput,
+  ): Promise<void> {
     if (!this.selectedStyle) return
     this.agentRunner.markTurn(0, '[INITIALIZATION]')
     const sessionId = uuid()
     this.applySessionScope(sessionId)
 
-    this.configLoader = new ExtensionConfigLoader({ style: this.selectedStyle })
+    const styleWithProfile: StyleConfig = {
+      ...this.selectedStyle,
+      player_profile: profile,
+    }
+    this.configLoader = new ExtensionConfigLoader({ style: styleWithProfile })
     this.rebuildScopedServices()
     this.listener?.onInitProgress({ key: 'init.generatingWorld' })
 
@@ -330,19 +387,39 @@ export class GameLoop {
         currentLocation: startLocation,
       }
 
+      doc.characters.player_character.attributes = attributes
+      await this.stateStore.set(
+        `player:attributes:${doc.characters.player_character.id}`,
+        attributes,
+      )
+      await this.sessionStore.saveGenesis(doc)
+
       this.listener?.onInitComplete(doc)
 
-      // Enter character creation phase: send random attributes
-      this.pendingAttributes = randomAllocate()
-      this.awaitingCharConfirm = true
-      const meta = ATTRIBUTE_IDS.map((id) => ({
-        id,
-        display_name: ATTRIBUTE_META[id].display_name,
-        domain: ATTRIBUTE_META[id].domain,
-      }))
-      this.listener?.onCharCreate?.(this.pendingAttributes, meta)
+      const worldSetting = doc.world_setting
+      const label = worldSetting?.tone ?? 'Unnamed World'
+      this.store.createSession(sessionId, doc.id, label)
+      this.store.updateSession(sessionId, { location: startLocation })
+
+      const initialGraph: QuestGraph = { quests: [], nodes: [], edges: [] }
+      await this.stateStore.set('quests:graph', initialGraph)
+
+      await this.stateStore.set(
+        'narrative:guidance_mode',
+        deriveNarrativeGuidanceMode(styleWithProfile.story_pressure),
+      )
+
+      this.listener?.onStatus(startLocation, 1)
+      this.listener?.onNarrative(
+        doc.narrative_structure.inciting_event.narrative_text,
+        'inciting_event',
+      )
+      this.listener?.onQuestUpdate?.(initialGraph)
     } catch (err) {
       this.applySessionScope(null)
+      this.pendingAttributes = attributes
+      this.awaitingCharConfirm = true
+      this.emitCharacterCreation()
       this.listener?.onError(`Initialization failed: ${err instanceof Error ? err.message : String(err)}`)
       throw err
     }
@@ -351,61 +428,34 @@ export class GameLoop {
   rerollAttributes(): void {
     if (!this.awaitingCharConfirm) return
     this.pendingAttributes = randomAllocate()
-    const meta = ATTRIBUTE_IDS.map((id) => ({
-      id,
-      display_name: ATTRIBUTE_META[id].display_name,
-      domain: ATTRIBUTE_META[id].domain,
-    }))
-    this.listener?.onCharCreate?.(this.pendingAttributes, meta)
+    this.emitCharacterCreation()
   }
 
-  async confirmAttributes(attributes: PlayerAttributes): Promise<void> {
-    if (!this.awaitingCharConfirm || !this.gameState) {
+  async confirmAttributes(
+    attributes: PlayerAttributes,
+    profile: PlayerProfileInput,
+  ): Promise<boolean> {
+    if (!this.awaitingCharConfirm || !this.selectedStyle) {
       this.listener?.onError('Not in character creation phase')
-      return
+      return false
     }
 
     const error = validateAllocation(attributes)
     if (error) {
       this.listener?.onError(`Invalid attribute allocation: ${error}`)
-      return
+      return false
     }
 
-    // Persist attributes
-    await this.stateStore.set(
-      `player:attributes:${this.gameState.playerCharacterId}`,
-      attributes,
-    )
-
-    // Store on genesis doc for reference
-    this.gameState.genesisDoc.characters.player_character.attributes = attributes
+    const profileResult = PlayerProfileInputSchema.safeParse(profile)
+    if (!profileResult.success) {
+      this.listener?.onError(`Invalid player profile: ${profileResult.error.issues[0]?.message ?? 'unknown error'}`)
+      return false
+    }
 
     this.awaitingCharConfirm = false
     this.pendingAttributes = null
-
-    // Create a session record
-    const worldSetting = this.gameState.genesisDoc.world_setting
-    const label = worldSetting?.tone ?? 'Unnamed World'
-    this.store.createSession(
-      this.gameState.sessionId,
-      this.gameState.genesisDoc.id,
-      label,
-    )
-    this.store.updateSession(this.gameState.sessionId, {
-      location: this.gameState.currentLocation,
-    })
-
-    // Initialize empty quest graph — quests emerge organically via QuestTrackingStep
-    const initialGraph: QuestGraph = { quests: [], nodes: [], edges: [] }
-    await this.stateStore.set('quests:graph', initialGraph)
-
-    // Now start the game proper
-    this.listener?.onStatus(this.gameState.currentLocation, this.gameState.currentTurn)
-    const inciting = this.gameState.genesisDoc.narrative_structure.inciting_event
-    this.listener?.onNarrative(inciting.narrative_text, 'inciting_event')
-
-    // Send initial quest graph
-    this.listener?.onQuestUpdate?.(initialGraph)
+    await this.generateWorld(attributes, profileResult.data)
+    return true
   }
 
   get isAwaitingCharConfirm(): boolean {
@@ -837,6 +887,9 @@ export class GameLoop {
       id: pc.id,
       name: pc.name,
       background: pc.background,
+      gender: pc.gender,
+      age: pc.age,
+      role: pc.role,
       attributes: playerAttrs,
     }
 
@@ -871,6 +924,9 @@ export class GameLoop {
 
   private async runNarrativeRailCheck(): Promise<void> {
     if (!this.gameState) return
+
+    const guidanceMode = await this.stateStore.get<string>('narrative:guidance_mode')
+    if (guidanceMode !== 'DIRECTED') return
 
     // Get current narrative phase
     const phaseIndex = await this.stateStore.get<number>('narrative:current_phase_index') ?? 0

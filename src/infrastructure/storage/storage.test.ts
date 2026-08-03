@@ -82,6 +82,8 @@ function makeGenesisDocument(overrides: Partial<GenesisDocument> = {}): GenesisD
       background: 'A noir city plagued by corruption',
       tone: 'dark',
       core_conflict: 'Power struggle between factions',
+      story_drivers: ['MYSTERY'],
+      story_pressure: 'ACTIVE',
       hidden_secrets: ['The mayor is the real boss'],
       factions: [],
     },

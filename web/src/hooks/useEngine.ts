@@ -9,6 +9,8 @@ import type { AttributeCheckResult } from '@engine/orchestration/steps/arbitrati
 import type { ChoiceForClient } from '@engine/engine/game-loop'
 import { STYLE_PRESETS } from '@engine/domain/services/extension-config'
 import type { StyleConfig } from '@engine/domain/services/extension-config'
+import { WORLD_BUILDER_CONFIG } from '@engine/domain/services/world-creation'
+import type { ResolvedWorldBrief, WorldBuilderConfig } from '@engine/domain/models/world-creation'
 import {
   loadLLMConfig,
   saveLLMConfig,
@@ -247,10 +249,20 @@ function createListener(
       }
     },
 
-    onStyleSelect(_presets: Array<{ label: string; description: string }>) {
+    onStyleSelect(_presets: Array<{ id: string; label: string; description: string; story_drivers: string[]; story_pressure: string }>) {
       store.getState().setStylePresets(
-        STYLE_PRESETS.map(p => ({ id: p.id, label: p.label, description: p.description })),
+        STYLE_PRESETS.map(p => ({
+          id: p.id,
+          label: p.label,
+          description: p.description,
+          story_drivers: [...p.story_drivers],
+          story_pressure: p.story_pressure,
+        })),
       )
+    },
+
+    onWorldBuilderConfig(config: WorldBuilderConfig) {
+      store.getState().setWorldBuilderConfig(config)
     },
 
     onSessionList(sessions: Array<{ id: string; label: string; turn: number; location: string; updated_at: number }>) {
@@ -282,9 +294,22 @@ function createListener(
       s.appendNarrative('', 'spacer')
     },
 
-    onCharCreate(attributes: PlayerAttributes, meta: Array<{ id: string; display_name: string; domain: string }>) {
-      record({ type: 'char_create', attributes: attributes as unknown as Record<string, number>, attribute_meta: meta })
-      store.getState().setCharCreate({ attributes: attributes as unknown as Record<string, number>, meta })
+    onCharCreate(
+      attributes: PlayerAttributes,
+      meta: Array<{ id: string; display_name: string; domain: string }>,
+      worldBrief: ResolvedWorldBrief | { tone: string; story_drivers: string[]; story_pressure: string },
+    ) {
+      record({
+        type: 'char_create',
+        attributes: attributes as unknown as Record<string, number>,
+        attribute_meta: meta,
+        world_brief: worldBrief,
+      })
+      store.getState().setCharCreate({
+        attributes: attributes as unknown as Record<string, number>,
+        meta,
+        worldBrief,
+      })
     },
 
     onQuestUpdate(graph: import('../types/protocol').QuestGraphForClient) {
@@ -340,9 +365,7 @@ async function handleMessage(
           return
         }
         if (engine.isAwaitingStyleSelect) {
-          store.getState().setStylePresets(
-            STYLE_PRESETS.map(p => ({ id: p.id, label: p.label, description: p.description })),
-          )
+          store.getState().setWorldBuilderConfig(WORLD_BUILDER_CONFIG)
           return
         }
         if (initializingRef.current) {
@@ -398,10 +421,18 @@ async function handleMessage(
         if (idx === -1) {
           const randomIdx = Math.floor(Math.random() * STYLE_PRESETS.length)
           const s = STYLE_PRESETS[randomIdx]
-          style = { tone: s.tone, complexity: s.complexity, narrative_style: s.narrative_style, player_archetype: s.player_archetype }
+          style = {
+            ...s,
+            story_drivers: (msg.story_drivers as typeof s.story_drivers | undefined) ?? s.story_drivers,
+            story_pressure: (msg.story_pressure as typeof s.story_pressure | undefined) ?? s.story_pressure,
+          }
         } else if (idx >= 0 && idx < STYLE_PRESETS.length) {
           const s = STYLE_PRESETS[idx]
-          style = { tone: s.tone, complexity: s.complexity, narrative_style: s.narrative_style, player_archetype: s.player_archetype }
+          style = {
+            ...s,
+            story_drivers: (msg.story_drivers as typeof s.story_drivers | undefined) ?? s.story_drivers,
+            story_pressure: (msg.story_pressure as typeof s.story_pressure | undefined) ?? s.story_pressure,
+          }
         } else {
           store.getState().appendNarrative(t('game:error.invalidPresetIndex'), 'error')
           return
@@ -430,8 +461,28 @@ async function handleMessage(
             tone: msg.tone,
             complexity: 'MEDIUM',
             narrative_style: msg.narrative_style,
-            player_archetype: msg.player_archetype,
+            player_archetype: '',
+            story_drivers: msg.story_drivers as StyleConfig['story_drivers'],
+            story_pressure: msg.story_pressure as StyleConfig['story_pressure'],
           })
+        } finally {
+          initializingRef.current = false
+        }
+        break
+
+      case 'select_world':
+        if (!isLLMConfigured()) {
+          store.getState().appendNarrative(t('game:system.llmNotConfiguredShort'), 'system')
+          return
+        }
+        if (!engine.isAwaitingStyleSelect) {
+          store.getState().appendNarrative(t('game:error.notInStyleSelect'), 'error')
+          return
+        }
+        initializingRef.current = true
+        try {
+          await engine.selectWorld(msg.draft)
+          store.getState().setWorldBuilderConfig(null)
         } finally {
           initializingRef.current = false
         }
@@ -450,9 +501,18 @@ async function handleMessage(
           store.getState().appendNarrative(t('game:error.notInCharCreate'), 'error')
           return
         }
-        await engine.confirmAttributes(msg.attributes as unknown as PlayerAttributes)
-        initializedRef.current = true
-        sessionMessagesRef.current = sessionMessagesRef.current.filter(m => m.type !== 'char_create')
+        initializingRef.current = true
+        try {
+          const confirmed = await engine.confirmAttributes(
+            msg.attributes as unknown as PlayerAttributes,
+            msg.profile,
+          )
+          if (!confirmed) break
+          initializedRef.current = true
+          sessionMessagesRef.current = sessionMessagesRef.current.filter(m => m.type !== 'char_create')
+        } finally {
+          initializingRef.current = false
+        }
         await engine.saveSessionHistory(sessionMessagesRef.current)
         break
 
@@ -777,7 +837,11 @@ function replaySingleMessage(msg: any, store: typeof useGameStore) {
       break
     }
     case 'char_create':
-      s.setCharCreate({ attributes: msg.attributes, meta: msg.attribute_meta })
+      s.setCharCreate({
+        attributes: msg.attributes,
+        meta: msg.attribute_meta,
+        worldBrief: msg.world_brief,
+      })
       break
     case 'save_result':
       s.appendNarrative(t('game:system.saveSuccess', { id: msg.saveId.slice(0, 8) }), 'system')

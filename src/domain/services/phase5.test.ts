@@ -17,6 +17,11 @@ import { InMemorySessionStore } from '../../infrastructure/storage/session-store
 import { AgentRunner } from '../../ai/runner/agent-runner.js'
 import type { ILLMProvider, LLMMessage, LLMResponse } from '../../ai/runner/llm-provider.js'
 import type { GenesisDocument } from '../models/genesis.js'
+import {
+  WORLD_PRESETS,
+  resolveWorldCreationDraft,
+  worldBriefToStyleConfig,
+} from './world-creation.js'
 
 // ============================================================
 // Mock LLM Provider
@@ -24,13 +29,15 @@ import type { GenesisDocument } from '../models/genesis.js'
 
 class MockLLMProvider implements ILLMProvider {
   responses: string[] = []
+  calls: LLMMessage[][] = []
   private callIndex = 0
 
   queueResponse(response: string): void {
     this.responses.push(response)
   }
 
-  async call(_messages: LLMMessage[]): Promise<LLMResponse> {
+  async call(messages: LLMMessage[]): Promise<LLMResponse> {
+    this.calls.push(messages)
     const content = this.callIndex < this.responses.length
       ? this.responses[this.callIndex++]
       : '{}'
@@ -50,6 +57,8 @@ function makeTestGenesisDoc(): GenesisDocument {
       background: 'A noir city plagued by corruption',
       tone: 'Dark political thriller',
       core_conflict: 'Power struggle between factions',
+      story_drivers: ['MYSTERY'],
+      story_pressure: 'ACTIVE',
       hidden_secrets: ['The mayor is controlled by the syndicate'],
       factions: [
         {
@@ -368,6 +377,92 @@ describe('InitializationAgent', () => {
     // Narrative rail setup
     const phases = await stateStore.get('narrative:phases')
     expect(phases).not.toBeNull()
+  })
+
+  it('keeps the player-selected profile canonical when generating the world', async () => {
+    const testDoc = makeTestGenesisDoc()
+    mockLLM.queueResponse(JSON.stringify(testDoc))
+    configLoader = new ExtensionConfigLoader({
+      style: {
+        story_drivers: ['RELATIONSHIP', 'GROWTH'],
+        story_pressure: 'CALM',
+        player_profile: {
+          gender: 'FEMALE',
+          name: '林夏',
+          age: '二十四岁',
+          role: '书店店员',
+          background_seed: '她刚接手外婆留下的小书店。',
+        },
+      },
+    })
+
+    const agent = new InitializationAgent({
+      agentRunner: runner,
+      stateStore,
+      eventStore,
+      sessionStore,
+      loreStore,
+      configLoader,
+    })
+
+    const doc = await agent.initialize()
+    const player = doc.characters.player_character
+
+    expect(player.gender).toBe('FEMALE')
+    expect(player.name).toBe('林夏')
+    expect(player.age).toBe('二十四岁')
+    expect(player.role).toBe('书店店员')
+    expect(player.player_notes).toBe('她刚接手外婆留下的小书店。')
+    expect(player.background).toContain('她刚接手外婆留下的小书店。')
+    expect(doc.world_setting.story_drivers).toEqual(['RELATIONSHIP', 'GROWTH'])
+    expect(doc.world_setting.story_pressure).toBe('CALM')
+  })
+
+  it('injects world choices as structured user data instead of interpolating them into the system prompt', async () => {
+    const testDoc = makeTestGenesisDoc()
+    mockLLM.queueResponse(JSON.stringify(testDoc))
+    const selectedDraft = {
+      ...WORLD_PRESETS.find((preset) => preset.id === 'cozy_town')!.draft,
+      custom_requirements: '多一些雨天和手艺人的生活',
+      excluded_content: '不要救世主预言',
+    }
+    const brief = resolveWorldCreationDraft(selectedDraft)
+    configLoader = new ExtensionConfigLoader({
+      style: {
+        ...worldBriefToStyleConfig(brief),
+        player_profile: {
+          gender: 'FEMALE',
+          name: '林夏',
+        },
+      },
+    })
+
+    const agent = new InitializationAgent({
+      agentRunner: runner,
+      stateStore,
+      eventStore,
+      sessionStore,
+      loreStore,
+      configLoader,
+    })
+
+    const doc = await agent.initialize()
+    const messages = mockLLM.calls[0]
+    const system = messages.find((message) => message.role === 'system')!.content
+    const user = JSON.parse(messages.find((message) => message.role === 'user')!.content)
+
+    expect(system).not.toContain('多一些雨天和手艺人的生活')
+    expect(system).not.toContain('林夏')
+    expect(user.public_world_brief).toMatchObject({
+      primary_stage: 'SMALL_TOWN',
+      themes: ['DAILY', 'RELATIONSHIP'],
+      custom_requirements: '多一些雨天和手艺人的生活',
+      excluded_content: '不要救世主预言',
+    })
+    expect(user.runtime_guidance).toMatchObject({ mode: 'OPEN', pressure: 'CALM' })
+    expect(user.player_profile).toEqual({ gender: 'FEMALE', name: '林夏' })
+    expect(JSON.stringify(user)).not.toContain('attributes')
+    expect(doc.world_setting.creation_brief).toEqual(brief)
   })
 
   it('initializeFromExisting reuses genesis document', async () => {
