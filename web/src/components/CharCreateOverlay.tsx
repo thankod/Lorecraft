@@ -86,10 +86,12 @@ function CharCreatePanel({
 
   let resolvedWorld = null
   let resolvedFamily = ''
+  let worldFamily = 'UNSELECTED'
   let worldTitle: string
   let worldThemes: string
   if ('schema_version' in charCreate.worldBrief) {
     resolvedWorld = charCreate.worldBrief
+    worldFamily = resolvedWorld.kernel.family
     resolvedFamily = tu(`worldBuilder.option.${resolvedWorld.kernel.family}`) as string
     const anchor = Object.entries(resolvedWorld.kernel).find(([field]) => field !== 'family')?.[1] ?? ''
     worldTitle = tu('worldBuilder.previewTitleV2', {
@@ -108,7 +110,7 @@ function CharCreatePanel({
 
   return (
     <div className="char-create-overlay">
-      <div className="character-builder" role="dialog" aria-modal="true" aria-labelledby="character-builder-title">
+      <div className="character-builder" role="dialog" aria-modal="true" aria-labelledby="character-builder-title" data-family={worldFamily}>
         <header className="character-builder-header">
           <div className="creation-progress">
             <span>01 {tu('creation.worldStep')}</span>
