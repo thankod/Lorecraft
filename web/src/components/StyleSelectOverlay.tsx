@@ -18,6 +18,7 @@ import {
 } from '@engine/domain/services/world-creation'
 import { useGameStore } from '../stores/useGameStore'
 import { useT } from '../i18n'
+import './CreationFlow.css'
 import './StyleSelectOverlay.css'
 
 type BuilderMode = 'quick' | 'detailed'

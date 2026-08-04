@@ -1,0 +1,233 @@
+/* Shared creation-flow shell. Its surfaces, controls and motion deliberately
+   follow the settings page so world and character creation feel native. */
+.style-overlay,
+.char-create-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 2vw, 28px);
+  background: rgb(4 4 6 / 0.88);
+  backdrop-filter: blur(8px);
+  animation: creationOverlayIn 180ms ease-out;
+}
+
+@keyframes creationOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.world-builder,
+.character-builder {
+  width: min(1280px, 100%);
+  height: min(900px, 100%);
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-overlay);
+  animation: creationPanelIn 240ms var(--ease-out);
+}
+
+.world-builder { container: world-builder / inline-size; }
+.character-builder { container: character-builder / inline-size; }
+
+@keyframes creationPanelIn {
+  from { opacity: 0; transform: scale(0.985) translateY(6px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.world-builder-header,
+.character-builder-header {
+  min-height: 88px;
+  padding: 18px clamp(20px, 2.6cqi, 32px);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  box-shadow: 0 1px 0 var(--edge-highlight-sm) inset;
+}
+
+.world-builder-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--control-min-height);
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.character-builder-header {
+  display: grid;
+  align-content: center;
+}
+
+.world-builder .creation-progress,
+.character-builder .creation-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 22px;
+  margin-bottom: 6px;
+  color: var(--fg-muted);
+  font-family: var(--font-ui);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.world-builder .creation-progress .active,
+.character-builder .creation-progress .active {
+  color: var(--title);
+}
+
+.world-builder-header h2,
+.character-builder-header h2 {
+  margin: 0;
+  color: var(--title);
+  font-family: var(--font-display);
+  font-size: var(--text-heading-sm);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+  mix-blend-mode: var(--title-blend);
+}
+
+.character-builder-header p {
+  margin: 4px 0 0;
+  color: var(--fg-muted);
+  font-size: var(--text-small);
+  line-height: 1.5;
+}
+
+.world-builder-close {
+  width: var(--control-min-height);
+  height: var(--control-min-height);
+  padding: 0;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-subtitle);
+  transition: color var(--duration-fast), background var(--duration-fast);
+}
+
+.world-builder-close:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+
+.world-builder-footer,
+.character-builder-footer {
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding: 11px clamp(20px, 2.6cqi, 32px);
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.world-builder-footer > span,
+.character-builder-footer > span {
+  margin-right: auto;
+  color: var(--fg-muted);
+  font-size: var(--text-small);
+}
+
+.world-builder-footer > button,
+.primary-action {
+  min-width: 168px;
+  min-height: var(--control-min-height);
+  padding: 10px 22px;
+  color: var(--title);
+  background: var(--gradient-accent-soft);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 0 var(--edge-highlight-md);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: var(--text-small);
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition:
+    background var(--duration-normal) var(--ease-candle),
+    box-shadow var(--duration-normal) var(--ease-candle),
+    color var(--duration-normal) var(--ease-candle),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.world-builder-footer > button:hover:not(:disabled),
+.primary-action:hover:not(:disabled) {
+  color: var(--highlight);
+  background: var(--gradient-accent-hover);
+  box-shadow: inset 0 1px 0 var(--edge-highlight-md), var(--glow-accent-soft);
+  transform: translateY(-1px);
+}
+
+.world-builder-footer > button:disabled,
+.primary-action:disabled {
+  opacity: 0.3;
+  cursor: default;
+  transform: none;
+}
+
+.text-action {
+  min-height: var(--control-min-height);
+  padding: 9px 18px;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: var(--text-small);
+  font-weight: 600;
+  letter-spacing: 0.7px;
+  transition: border-color var(--duration-normal), color var(--duration-normal), background var(--duration-normal);
+}
+
+.text-action:hover {
+  color: var(--title);
+  border-color: var(--border-accent);
+  background: rgb(var(--title-rgb) / 0.04);
+}
+
+@container world-builder (max-width: 42rem) {
+  .world-builder-header,
+  .world-builder-footer { padding-inline: 16px; }
+  .world-builder-footer > span { display: none; }
+  .world-builder-footer > button { width: 100%; }
+}
+
+@container character-builder (max-width: 42rem) {
+  .character-builder-header,
+  .character-builder-footer { padding-inline: 16px; }
+  .character-builder-footer > span { display: none; }
+  .primary-action { flex: 1; min-width: 0; }
+}
+
+@media (max-width: 640px) {
+  .style-overlay,
+  .char-create-overlay { padding: 0; }
+
+  .world-builder,
+  .character-builder {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .style-overlay,
+  .char-create-overlay,
+  .world-builder,
+  .character-builder { animation: none; }
+}

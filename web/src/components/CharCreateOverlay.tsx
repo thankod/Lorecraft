@@ -3,6 +3,7 @@ import { useGameStore } from '../stores/useGameStore'
 import { useT } from '../i18n'
 import type { CharCreateState } from '../stores/useGameStore'
 import type { PlayerProfileInput } from '../types/protocol'
+import './CreationFlow.css'
 import './CharCreateOverlay.css'
 
 const ATTRIBUTE_TOTAL = 400
@@ -120,9 +121,7 @@ function CharCreatePanel({
           <h2 id="character-builder-title">
             {step === 'profile' ? t('profileTitle') : t('reviewTitle')}
           </h2>
-          <p>
-            {step === 'profile' ? t('profileSubtitle', { total: ATTRIBUTE_TOTAL }) : t('reviewSubtitle')}
-          </p>
+          {step === 'profile' && <p>{t('profileSubtitle', { total: ATTRIBUTE_TOTAL })}</p>}
         </header>
 
         {step === 'profile' && (
@@ -137,7 +136,6 @@ function CharCreatePanel({
                 {resolvedWorld && <div><dt>{t('worldType')}</dt><dd>{resolvedFamily}</dd></div>}
                 {resolvedWorld && <div><dt>{t('mood')}</dt><dd>{tu(`worldBuilder.option.${resolvedWorld.mood}`)}</dd></div>}
               </dl>
-              <small>{t('worldDoesNotDefineCharacter')}</small>
             </aside>
 
             <div className="character-profile-body">
