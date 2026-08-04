@@ -162,6 +162,7 @@ export function StyleSelectOverlay() {
         aria-modal="true"
         aria-labelledby="world-builder-title"
         data-family={selectedFamily ?? 'UNSELECTED'}
+        data-mode={mode}
       >
         <header className="world-builder-header">
           <div className="world-builder-heading">
@@ -171,51 +172,46 @@ export function StyleSelectOverlay() {
               <span>03 {t('creation.reviewStep')}</span>
             </div>
             <h2 id="world-builder-title">{t('worldBuilder.title')}</h2>
-            <p>{t('worldBuilder.subtitle')}</p>
-          </div>
-          <div className="builder-mode-tabs" role="tablist" aria-label={t('worldBuilder.modeLabel')}>
-            <button type="button" role="tab" aria-selected={mode === 'quick'} className={mode === 'quick' ? 'active' : ''} onClick={() => setMode('quick')}>
-              <span>{t('worldBuilder.quick')}</span>
-              <small>{t('worldBuilder.quickHint')}</small>
-            </button>
-            <button type="button" role="tab" aria-selected={mode === 'detailed'} className={mode === 'detailed' ? 'active' : ''} onClick={() => setMode('detailed')}>
-              <span>{t('worldBuilder.detailed')}</span>
-              <small>{t('worldBuilder.detailedHint')}</small>
-            </button>
           </div>
           <button className="world-builder-close" onClick={() => useGameStore.getState().setWorldBuilderConfig(null)} aria-label={t('worldBuilder.close')}>&#10005;</button>
         </header>
 
-        <div className="preset-shelf" aria-label={t('worldBuilder.presets')}>
-          <div className="preset-shelf-label">
-            <span>{t('worldBuilder.presets')}</span>
-            <small>{t('worldBuilder.presetsHint')}</small>
-          </div>
-          <div className="preset-scroll">
-            {config.presets.map((preset, index) => {
-              const family = preset.draft.kernel?.family
-              return (
-                <button
-                  type="button"
-                  key={preset.id}
-                  data-family={family}
-                  className={sourcePreset?.id === preset.id ? 'selected' : ''}
-                  onClick={() => choosePreset(index)}
-                >
-                  <i aria-hidden="true">{family ? FAMILY_MARKS[family] : ''}</i>
-                  <span>{tc(`preset.${preset.id}.label`, { defaultValue: preset.label })}</span>
-                  <small>{tc(`preset.${preset.id}.description`, { defaultValue: preset.description })}</small>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
         <div className="world-builder-body">
-          <section className="world-controls" key={mode}>
+          <section className="world-settings-panel">
+            <div className="builder-mode-tabs" role="tablist" aria-label={t('worldBuilder.modeLabel')}>
+              <button type="button" role="tab" aria-selected={mode === 'quick'} className={mode === 'quick' ? 'active' : ''} onClick={() => setMode('quick')}>
+                <span>{t('worldBuilder.quick')}</span>
+              </button>
+              <button type="button" role="tab" aria-selected={mode === 'detailed'} className={mode === 'detailed' ? 'active' : ''} onClick={() => setMode('detailed')}>
+                <span>{t('worldBuilder.detailed')}</span>
+              </button>
+            </div>
+
+            <div className="preset-shelf" aria-label={t('worldBuilder.presets')}>
+              <div className="preset-shelf-label"><span>{t('worldBuilder.presets')}</span></div>
+              <div className="preset-scroll">
+                {config.presets.map((preset, index) => {
+                  const family = preset.draft.kernel?.family
+                  return (
+                    <button
+                      type="button"
+                      key={preset.id}
+                      data-family={family}
+                      className={sourcePreset?.id === preset.id ? 'selected' : ''}
+                      onClick={() => choosePreset(index)}
+                    >
+                      <i aria-hidden="true">{family ? FAMILY_MARKS[family] : ''}</i>
+                      <span>{tc(`preset.${preset.id}.label`, { defaultValue: preset.label })}</span>
+                      <small>{tc(`preset.${preset.id}.description`, { defaultValue: preset.description })}</small>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <section className="world-controls" key={mode}>
             <fieldset className="builder-section family-section">
               <legend><b>01</b>{t('worldBuilder.archetype')}</legend>
-              <p>{t('worldBuilder.archetypeHintV2')}</p>
               <div className="family-grid">
                 {config.catalogs.families.map(({ family }, index) => (
                   <button
@@ -273,7 +269,6 @@ export function StyleSelectOverlay() {
 
             <fieldset className="builder-section mood-section">
               <legend><b>{mode === 'quick' ? '03' : '04'}</b>{t('worldBuilder.mood')}</legend>
-              <p>{t('worldBuilder.moodHint')}</p>
               <div className="mood-line">
                 {config.catalogs.moods.map((mood) => (
                   <button type="button" key={mood} className={draft.mood === mood ? 'selected' : ''} onClick={() => updateField('mood', mood as StoryMood)}>
@@ -286,7 +281,6 @@ export function StyleSelectOverlay() {
             {mode === 'detailed' && (
               <fieldset className="builder-section free-text-section">
                 <legend><b>05</b>{t('worldBuilder.finalTouches')}</legend>
-                <p>{t('worldBuilder.finalTouchesHint')}</p>
                 <label>
                   <span>{t('worldBuilder.customRequirements')}</span>
                   <textarea maxLength={500} rows={3} value={draft.custom_requirements} onChange={(event) => updateField('custom_requirements', event.target.value)} placeholder={t('worldBuilder.customPlaceholderV2')} />
@@ -297,6 +291,7 @@ export function StyleSelectOverlay() {
                 </label>
               </fieldset>
             )}
+            </section>
           </section>
 
           <aside className="world-live-page" aria-live="polite">
@@ -309,15 +304,13 @@ export function StyleSelectOverlay() {
               <span className="live-page-kicker">{t('worldBuilder.livePreview')}</span>
               <h3>{previewTitle}</h3>
               <p className="live-page-deck">{previewThemes}</p>
-              {previewResolved ? (
+              {previewResolved && (
                 <dl>
                   {previewDetails.slice(0, 6).map((detail) => (
                     <div key={detail.field}><dt>{fieldLabel(detail.field)}</dt><dd>{label(detail.value)}</dd></div>
                   ))}
                   <div><dt>{t('worldBuilder.mood')}</dt><dd>{label(previewResolved.mood)}</dd></div>
                 </dl>
-              ) : (
-                <p className="live-page-empty">{t('worldBuilder.previewHintV2')}</p>
               )}
               {(draft.custom_requirements || draft.excluded_content) && (
                 <div className="live-page-notes">
@@ -334,7 +327,7 @@ export function StyleSelectOverlay() {
         </div>
 
         <footer className="world-builder-footer">
-          <span>{resolved ? t('worldBuilder.characterSeparate') : t('worldBuilder.requiredHintV2')}</span>
+          {!resolved && <span>{t('worldBuilder.requiredHintV2')}</span>}
           <button type="button" disabled={!resolved} onClick={continueToCharacter}>{t('worldBuilder.continue')}</button>
         </footer>
       </main>
