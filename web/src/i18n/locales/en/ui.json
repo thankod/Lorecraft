@@ -17,6 +17,7 @@
   "creation.worldStep": "World",
   "creation.characterStep": "Character",
   "creation.attributesStep": "Attributes",
+  "creation.characterSetupStep": "Character & Attributes",
   "creation.reviewStep": "Review",
 
   "style.title": "Begin with a world",

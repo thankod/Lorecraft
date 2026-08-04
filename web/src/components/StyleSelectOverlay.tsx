@@ -167,9 +167,8 @@ export function StyleSelectOverlay() {
           <div className="world-builder-heading">
             <div className="creation-progress" aria-label={t('creation.progressLabel')}>
               <span className="active">01 {t('creation.worldStep')}</span>
-              <span>02 {t('creation.characterStep')}</span>
-              <span>03 {t('creation.attributesStep')}</span>
-              <span>04 {t('creation.reviewStep')}</span>
+              <span>02 {t('creation.characterSetupStep')}</span>
+              <span>03 {t('creation.reviewStep')}</span>
             </div>
             <h2 id="world-builder-title">{t('worldBuilder.title')}</h2>
             <p>{t('worldBuilder.subtitle')}</p>

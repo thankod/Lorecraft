@@ -17,6 +17,7 @@
   "creation.worldStep": "世界",
   "creation.characterStep": "人物",
   "creation.attributesStep": "属性",
+  "creation.characterSetupStep": "人物与属性",
   "creation.reviewStep": "确认",
 
   "style.title": "从一个世界开始",

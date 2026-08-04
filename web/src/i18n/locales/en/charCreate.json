@@ -1,6 +1,9 @@
 {
+  "profileTitle": "Shape your character",
+  "profileSubtitle": "Define identity and allocate {{total}} attribute points in one place.",
   "identityTitle": "Decide who you are",
   "identitySubtitle": "The world is chosen, but it does not assign your identity. Gender is required; the rest may be left for the world to generate.",
+  "identitySectionHint": "Choose a gender explicitly; all other identity details may be left for the world to generate.",
   "title": "Allocate attributes",
   "subtitle": "Total points {{total}} · Each 0-100 · Drag sliders to adjust",
   "reviewTitle": "Review the opening dossier",
@@ -33,6 +36,7 @@
   "generatedByWorld": "Generated naturally by the world",
   "reviewAttributes": "Attributes",
   "identityAuthorityHint": "Gender currently supports Male / Female and must be chosen explicitly.",
+  "readyForReview": "Identity and attributes are ready to review.",
   "back": "Back",
   "continueAttributes": "Continue to attributes",
   "continueReview": "Review opening dossier",

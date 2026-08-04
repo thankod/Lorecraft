@@ -1,6 +1,9 @@
 {
+  "profileTitle": "人物を形づくる",
+  "profileSubtitle": "同じ画面で人物像を決め、合計 {{total}} ポイントの属性を配分します。",
   "identityTitle": "自分が誰かを決める",
   "identitySubtitle": "世界は決まりましたが、人物の設定は決まっていません。性別は必須で、ほかは世界に自然な生成を任せられます。",
+  "identitySectionHint": "性別は明示的に選択し、その他の人物情報は世界に自然な生成を任せられます。",
   "title": "属性を配分する",
   "subtitle": "合計ポイント {{total}} · 各 0-100 · スライダーで調整",
   "reviewTitle": "オープニング設定を確認",
@@ -33,6 +36,7 @@
   "generatedByWorld": "世界に合わせて生成",
   "reviewAttributes": "属性",
   "identityAuthorityHint": "性別は現在、男性 / 女性に対応し、明示的な選択が必要です。",
+  "readyForReview": "人物像と属性を確認できます。",
   "back": "戻る",
   "continueAttributes": "属性配分へ",
   "continueReview": "設定を確認",
