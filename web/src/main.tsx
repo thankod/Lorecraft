@@ -9,6 +9,7 @@ import './App.css'
 // Restore saved font scale before first paint
 const savedScale = localStorage.getItem('lorecraft:font-scale')
 if (savedScale) {
+  document.documentElement.style.setProperty('--ui-zoom', savedScale)
   const root = document.getElementById('root')
   if (root) root.style.zoom = savedScale
 }

@@ -21,6 +21,15 @@
   --font-ui:         'DM Sans', 'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
   --font-mono:       'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
 
+  /* Readable UI type scale — 1rem follows the app's 14px baseline. */
+  --text-caption: 0.857rem;
+  --text-small: 0.929rem;
+  --text-body: 1rem;
+  --text-subtitle: 1.143rem;
+  --text-heading-sm: 1.429rem;
+  --text-heading-lg: clamp(1.714rem, 1.35rem + 1.5vw, 2.286rem);
+  --control-min-height: 2.857rem;
+
   /* ── Spacing scale ── */
   --space-xs: 4px;
   --space-sm: 8px;
