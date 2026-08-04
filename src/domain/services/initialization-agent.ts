@@ -241,12 +241,7 @@ export class InitializationAgent {
     const publicWorldBrief = brief
       ? {
           schema_version: brief.schema_version,
-          civilization_stage: brief.civilization_stage,
-          world_tradition: brief.world_tradition,
-          primary_stage: brief.primary_stage,
-          social_form: brief.social_form,
-          technology_level: brief.technology_level,
-          supernatural_boundary: brief.supernatural_boundary,
+          world_kernel: brief.kernel,
           themes: brief.themes,
           mood: brief.mood,
           custom_requirements: brief.custom_requirements,

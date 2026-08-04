@@ -454,7 +454,11 @@ describe('InitializationAgent', () => {
     expect(system).not.toContain('多一些雨天和手艺人的生活')
     expect(system).not.toContain('林夏')
     expect(user.public_world_brief).toMatchObject({
-      primary_stage: 'SMALL_TOWN',
+      world_kernel: {
+        family: 'CONTEMPORARY',
+        environment: 'SMALL_TOWN',
+        social_sphere: 'NEIGHBORHOOD',
+      },
       themes: ['DAILY', 'RELATIONSHIP'],
       custom_requirements: '多一些雨天和手艺人的生活',
       excluded_content: '不要救世主预言',

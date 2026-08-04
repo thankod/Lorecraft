@@ -85,13 +85,16 @@ function CharCreatePanel({
   }
 
   let resolvedWorld = null
+  let resolvedFamily = ''
   let worldTitle: string
   let worldThemes: string
   if ('schema_version' in charCreate.worldBrief) {
     resolvedWorld = charCreate.worldBrief
-    worldTitle = tu('worldBuilder.previewTitle', {
-      tradition: tu(`worldBuilder.option.${resolvedWorld.world_tradition}`),
-      stage: tu(`worldBuilder.option.${resolvedWorld.primary_stage}`),
+    resolvedFamily = tu(`worldBuilder.option.${resolvedWorld.kernel.family}`) as string
+    const anchor = Object.entries(resolvedWorld.kernel).find(([field]) => field !== 'family')?.[1] ?? ''
+    worldTitle = tu('worldBuilder.previewTitleV2', {
+      family: resolvedFamily,
+      anchor: tu(`worldBuilder.option.${anchor}`, { defaultValue: anchor }),
     }) as string
     worldThemes = resolvedWorld.themes
       .map((theme) => tu(`worldBuilder.option.${theme}`))
@@ -132,7 +135,7 @@ function CharCreatePanel({
               <p>{worldTitle}</p>
               <dl>
                 <div><dt>{t('themes')}</dt><dd>{worldThemes}</dd></div>
-                {resolvedWorld && <div><dt>{t('tradition')}</dt><dd>{tu(`worldBuilder.option.${resolvedWorld.world_tradition}`)}</dd></div>}
+                {resolvedWorld && <div><dt>{t('worldType')}</dt><dd>{resolvedFamily}</dd></div>}
                 {resolvedWorld && <div><dt>{t('mood')}</dt><dd>{tu(`worldBuilder.option.${resolvedWorld.mood}`)}</dd></div>}
               </dl>
               <small>{t('worldDoesNotDefineCharacter')}</small>

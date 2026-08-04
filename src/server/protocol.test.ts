@@ -53,7 +53,7 @@ describe('world builder protocol', () => {
       type: 'select_world',
       draft: {
         ...WORLD_PRESETS[0].draft,
-        base_archetype: null,
+        kernel: null,
         primary_theme: null,
       },
     }).success).toBe(false)

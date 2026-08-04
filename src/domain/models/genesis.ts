@@ -2,7 +2,7 @@ import { z } from 'zod/v4'
 import { PlayerAttributesSchema } from './attributes.js'
 import { PlayerGenderSchema } from './player-profile.js'
 import { StoryDriverSchema, StoryPressureSchema } from './story.js'
-import { ResolvedWorldBriefSchema } from './world-creation.js'
+import { PersistedWorldBriefSchema } from './world-creation.js'
 
 // ============================================================
 // Genesis Document Sub-types
@@ -106,7 +106,7 @@ export const GenesisDocumentSchema = z.object({
     tone: z.string(),
     story_drivers: z.array(StoryDriverSchema).min(1).optional().default(['MYSTERY']),
     story_pressure: StoryPressureSchema.optional().default('ACTIVE'),
-    creation_brief: ResolvedWorldBriefSchema.optional(),
+    creation_brief: PersistedWorldBriefSchema.optional(),
     core_conflict: z.string().optional(),
     hidden_secrets: z.array(z.string()).optional().default([]),
     factions: z.array(FactionDefinitionSchema).optional().default([]),

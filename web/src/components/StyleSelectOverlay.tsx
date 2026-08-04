@@ -3,14 +3,18 @@ import type {
   StoryMood,
   StoryTheme,
   WorldCreationDraft,
+  WorldFamily,
+  WorldKernelDraft,
 } from '@engine/domain/models/world-creation'
 import { WorldCreationDraftSchema } from '@engine/domain/models/world-creation'
 import {
-  applyQuickWorldArchetype,
+  applyWorldFamily,
   applyWorldPreset,
   createEmptyWorldDraft,
+  getAvailableWorldDetailOptions,
   isDraftBasedOnPreset,
   resolveWorldCreationDraft,
+  updateWorldKernelField,
 } from '@engine/domain/services/world-creation'
 import { useGameStore } from '../stores/useGameStore'
 import { useT } from '../i18n'
@@ -18,14 +22,20 @@ import './StyleSelectOverlay.css'
 
 type BuilderMode = 'quick' | 'detailed'
 
-const DETAIL_FIELDS = [
-  'civilization_stage',
-  'world_tradition',
-  'primary_stage',
-  'social_form',
-  'technology_level',
-  'supernatural_boundary',
-] as const
+const FAMILY_MARKS: Record<WorldFamily, string> = {
+  CONTEMPORARY: '今',
+  MODERN_ANOMALY: '异',
+  HISTORICAL: '史',
+  WUXIA: '侠',
+  EASTERN_FANTASY: '玄',
+  WESTERN_FANTASY: '幻',
+  SCIENCE_FICTION: '星',
+  POST_COLLAPSE: '余',
+}
+
+function kernelValue(kernel: WorldKernelDraft, field: string): string {
+  return (kernel as unknown as Record<string, string>)[field] ?? 'AUTO'
+}
 
 export function StyleSelectOverlay() {
   const t = useT()
@@ -41,15 +51,45 @@ export function StyleSelectOverlay() {
     return result.success ? resolveWorldCreationDraft(result.data) : null
   }, [draft])
 
+  const previewResolved = useMemo(() => {
+    if (!draft.kernel) return null
+    const result = WorldCreationDraftSchema.safeParse({
+      ...draft,
+      primary_theme: draft.primary_theme ?? 'DAILY',
+    })
+    return result.success ? resolveWorldCreationDraft(result.data) : null
+  }, [draft])
+
   if (!config) return null
 
+  const selectedFamily = draft.kernel?.family ?? null
+  const familyDefinition = selectedFamily
+    ? config.catalogs.families.find((definition) => definition.family === selectedFamily) ?? null
+    : null
   const sourcePreset = draft.source_preset_id
     ? config.presets.find((preset) => preset.id === draft.source_preset_id) ?? null
     : null
   const exactPreset = sourcePreset ? isDraftBasedOnPreset(draft, sourcePreset) : false
 
   function label(value: string): string {
-    return t(`worldBuilder.option.${value}`, { defaultValue: value }) as string
+    const fallback = value
+      .toLowerCase()
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ')
+    return t(`worldBuilder.option.${value}`, { defaultValue: fallback }) as string
+  }
+
+  function fieldLabel(field: string): string {
+    const fallback = field
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ')
+    return t(`worldBuilder.field.${field}`, { defaultValue: fallback }) as string
+  }
+
+  function familyHint(family: WorldFamily): string {
+    return t(`worldBuilder.familyHint.${family}`, { defaultValue: '' }) as string
   }
 
   function rememberAndSet(next: WorldCreationDraft) {
@@ -62,23 +102,29 @@ export function StyleSelectOverlay() {
     if (preset) rememberAndSet(applyWorldPreset(draft, preset))
   }
 
-  function chooseArchetype(archetype: WorldCreationDraft['base_archetype']) {
-    if (!archetype || archetype === draft.base_archetype) return
-    rememberAndSet(applyQuickWorldArchetype(draft, archetype))
+  function chooseFamily(family: WorldFamily) {
+    if (family === selectedFamily) return
+    rememberAndSet(applyWorldFamily(draft, family))
   }
 
   function updateField<K extends keyof WorldCreationDraft>(key: K, value: WorldCreationDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
   }
 
+  function updateKernelField(field: string, value: string) {
+    setDraft((current) => {
+      if (!current.kernel) return current
+      return {
+        ...current,
+        kernel: updateWorldKernelField(current.kernel, field, value),
+      }
+    })
+  }
+
   function toggleTheme(theme: StoryTheme) {
     setDraft((current) => {
       if (current.primary_theme === theme) {
-        return {
-          ...current,
-          primary_theme: current.secondary_theme,
-          secondary_theme: null,
-        }
+        return { ...current, primary_theme: current.secondary_theme, secondary_theme: null }
       }
       if (current.secondary_theme === theme) {
         return { ...current, secondary_theme: null }
@@ -89,10 +135,6 @@ export function StyleSelectOverlay() {
     })
   }
 
-  function chooseMood(mood: StoryMood) {
-    updateField('mood', mood)
-  }
-
   function continueToCharacter() {
     const parsed = WorldCreationDraftSchema.safeParse(draft)
     if (!parsed.success) return
@@ -100,21 +142,29 @@ export function StyleSelectOverlay() {
     useGameStore.getState().setWorldBuilderConfig(null)
   }
 
-  const previewTitle = resolved
-    ? t('worldBuilder.previewTitle', {
-        tradition: label(resolved.world_tradition),
-        stage: label(resolved.primary_stage),
-      })
+  const resolvedKernel = previewResolved?.kernel as unknown as Record<string, string> | undefined
+  const previewDetails = previewResolved && familyDefinition
+    ? familyDefinition.questions.map((question) => ({ field: question.field, value: resolvedKernel?.[question.field] ?? '' }))
+    : []
+  const previewAnchor = previewDetails[0]?.value ? label(previewDetails[0].value) : ''
+  const previewTitle = previewResolved
+    ? t('worldBuilder.previewTitleV2', { family: label(previewResolved.kernel.family), anchor: previewAnchor })
     : t('worldBuilder.previewEmptyTitle')
-  const previewThemes = resolved
-    ? resolved.themes.map(label).join(t('worldBuilder.joiner') as string)
+  const previewThemes = draft.primary_theme
+    ? [draft.primary_theme, draft.secondary_theme].filter(Boolean).map((theme) => label(theme!)).join(t('worldBuilder.joiner') as string)
     : t('worldBuilder.previewEmptyThemes')
 
   return (
     <div className="style-overlay">
-      <main className="world-builder" role="dialog" aria-modal="true" aria-labelledby="world-builder-title">
+      <main
+        className="world-builder"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="world-builder-title"
+        data-family={selectedFamily ?? 'UNSELECTED'}
+      >
         <header className="world-builder-header">
-          <div>
+          <div className="world-builder-heading">
             <div className="creation-progress" aria-label={t('creation.progressLabel')}>
               <span className="active">01 {t('creation.worldStep')}</span>
               <span>02 {t('creation.characterStep')}</span>
@@ -123,11 +173,17 @@ export function StyleSelectOverlay() {
             <h2 id="world-builder-title">{t('worldBuilder.title')}</h2>
             <p>{t('worldBuilder.subtitle')}</p>
           </div>
-          <button
-            className="world-builder-close"
-            onClick={() => useGameStore.getState().setWorldBuilderConfig(null)}
-            aria-label={t('worldBuilder.close')}
-          >&#10005;</button>
+          <div className="builder-mode-tabs" role="tablist" aria-label={t('worldBuilder.modeLabel')}>
+            <button type="button" role="tab" aria-selected={mode === 'quick'} className={mode === 'quick' ? 'active' : ''} onClick={() => setMode('quick')}>
+              <span>{t('worldBuilder.quick')}</span>
+              <small>{t('worldBuilder.quickHint')}</small>
+            </button>
+            <button type="button" role="tab" aria-selected={mode === 'detailed'} className={mode === 'detailed' ? 'active' : ''} onClick={() => setMode('detailed')}>
+              <span>{t('worldBuilder.detailed')}</span>
+              <small>{t('worldBuilder.detailedHint')}</small>
+            </button>
+          </div>
+          <button className="world-builder-close" onClick={() => useGameStore.getState().setWorldBuilderConfig(null)} aria-label={t('worldBuilder.close')}>&#10005;</button>
         </header>
 
         <div className="preset-shelf" aria-label={t('worldBuilder.presets')}>
@@ -136,71 +192,62 @@ export function StyleSelectOverlay() {
             <small>{t('worldBuilder.presetsHint')}</small>
           </div>
           <div className="preset-scroll">
-            {config.presets.map((preset, index) => (
-              <button
-                type="button"
-                key={preset.id}
-                className={sourcePreset?.id === preset.id ? 'selected' : ''}
-                onClick={() => choosePreset(index)}
-              >
-                <span>{tc(`preset.${preset.id}.label`, { defaultValue: preset.label })}</span>
-                <small>{tc(`preset.${preset.id}.description`, { defaultValue: preset.description })}</small>
-              </button>
-            ))}
+            {config.presets.map((preset, index) => {
+              const family = preset.draft.kernel?.family
+              return (
+                <button
+                  type="button"
+                  key={preset.id}
+                  data-family={family}
+                  className={sourcePreset?.id === preset.id ? 'selected' : ''}
+                  onClick={() => choosePreset(index)}
+                >
+                  <i aria-hidden="true">{family ? FAMILY_MARKS[family] : ''}</i>
+                  <span>{tc(`preset.${preset.id}.label`, { defaultValue: preset.label })}</span>
+                  <small>{tc(`preset.${preset.id}.description`, { defaultValue: preset.description })}</small>
+                </button>
+              )
+            })}
           </div>
-        </div>
-
-        <div className="builder-mode-tabs" role="tablist" aria-label={t('worldBuilder.modeLabel')}>
-          <button type="button" role="tab" aria-selected={mode === 'quick'} className={mode === 'quick' ? 'active' : ''} onClick={() => setMode('quick')}>
-            <span>{t('worldBuilder.quick')}</span>
-            <small>{t('worldBuilder.quickHint')}</small>
-          </button>
-          <button type="button" role="tab" aria-selected={mode === 'detailed'} className={mode === 'detailed' ? 'active' : ''} onClick={() => setMode('detailed')}>
-            <span>{t('worldBuilder.detailed')}</span>
-            <small>{t('worldBuilder.detailedHint')}</small>
-          </button>
         </div>
 
         <div className="world-builder-body">
           <section className="world-controls" key={mode}>
-            <fieldset className="builder-section archetype-section">
+            <fieldset className="builder-section family-section">
               <legend><b>01</b>{t('worldBuilder.archetype')}</legend>
-              <p>{t('worldBuilder.archetypeHint')}</p>
-              <div className="archetype-grid">
-                {config.catalogs.quick_archetypes.map((archetype) => (
+              <p>{t('worldBuilder.archetypeHintV2')}</p>
+              <div className="family-grid">
+                {config.catalogs.families.map(({ family }, index) => (
                   <button
                     type="button"
-                    key={archetype}
-                    className={draft.base_archetype === archetype ? 'selected' : ''}
-                    onClick={() => chooseArchetype(archetype)}
+                    key={family}
+                    data-family={family}
+                    className={selectedFamily === family ? 'selected' : ''}
+                    onClick={() => chooseFamily(family)}
                   >
-                    <i aria-hidden="true" />
-                    <span>{label(archetype)}</span>
+                    <i aria-hidden="true">{FAMILY_MARKS[family]}</i>
+                    <span><b>{label(family)}</b><small>{familyHint(family)}</small></span>
+                    <em>{String(index + 1).padStart(2, '0')}</em>
                   </button>
                 ))}
               </div>
             </fieldset>
 
-            {mode === 'detailed' && (
+            {mode === 'detailed' && selectedFamily && draft.kernel && familyDefinition && (
               <fieldset className="builder-section detail-section">
                 <legend><b>02</b>{t('worldBuilder.worldDetails')}</legend>
-                <p>{t('worldBuilder.worldDetailsHint')}</p>
+                <p>{t('worldBuilder.worldDetailsHintV2', { family: label(selectedFamily) })}</p>
                 <div className="detail-selects">
-                  {DETAIL_FIELDS.map((field) => (
-                    <label key={field}>
-                      <span>{t(`worldBuilder.field.${field}`)}</span>
+                  {familyDefinition.questions.map((question, index) => (
+                    <label key={question.field}>
+                      <span><i>{String(index + 1).padStart(2, '0')}</i>{fieldLabel(question.field)}</span>
                       <select
-                        value={draft[field]}
-                        onChange={(event) => updateField(field, event.target.value as WorldCreationDraft[typeof field])}
+                        value={kernelValue(draft.kernel!, question.field)}
+                        onChange={(event) => updateKernelField(question.field, event.target.value)}
                       >
-                        {config.catalogs[
-                          field === 'civilization_stage' ? 'civilization_stages'
-                            : field === 'world_tradition' ? 'world_traditions'
-                              : field === 'primary_stage' ? 'primary_stages'
-                                : field === 'social_form' ? 'social_forms'
-                                  : field === 'technology_level' ? 'technology_levels'
-                                    : 'supernatural_boundaries'
-                        ].map((option) => <option key={option} value={option}>{label(option)}</option>)}
+                        {getAvailableWorldDetailOptions(draft.kernel!, question.field).map((option) => (
+                          <option key={option} value={option}>{label(option)}</option>
+                        ))}
                       </select>
                     </label>
                   ))}
@@ -229,7 +276,7 @@ export function StyleSelectOverlay() {
               <p>{t('worldBuilder.moodHint')}</p>
               <div className="mood-line">
                 {config.catalogs.moods.map((mood) => (
-                  <button type="button" key={mood} className={draft.mood === mood ? 'selected' : ''} onClick={() => chooseMood(mood)}>
+                  <button type="button" key={mood} className={draft.mood === mood ? 'selected' : ''} onClick={() => updateField('mood', mood as StoryMood)}>
                     {label(mood)}
                   </button>
                 ))}
@@ -242,7 +289,7 @@ export function StyleSelectOverlay() {
                 <p>{t('worldBuilder.finalTouchesHint')}</p>
                 <label>
                   <span>{t('worldBuilder.customRequirements')}</span>
-                  <textarea maxLength={500} rows={3} value={draft.custom_requirements} onChange={(event) => updateField('custom_requirements', event.target.value)} placeholder={t('worldBuilder.customPlaceholder')} />
+                  <textarea maxLength={500} rows={3} value={draft.custom_requirements} onChange={(event) => updateField('custom_requirements', event.target.value)} placeholder={t('worldBuilder.customPlaceholderV2')} />
                 </label>
                 <label>
                   <span>{t('worldBuilder.excludedContent')}</span>
@@ -253,38 +300,41 @@ export function StyleSelectOverlay() {
           </section>
 
           <aside className="world-live-page" aria-live="polite">
-            <span className="live-page-kicker">{t('worldBuilder.livePreview')}</span>
-            <div className="live-page-rule" />
-            <h3>{previewTitle}</h3>
-            <p className="live-page-deck">{previewThemes}</p>
-            {resolved ? (
-              <dl>
-                <div><dt>{t('worldBuilder.field.civilization_stage')}</dt><dd>{label(resolved.civilization_stage)}</dd></div>
-                <div><dt>{t('worldBuilder.field.social_form')}</dt><dd>{label(resolved.social_form)}</dd></div>
-                <div><dt>{t('worldBuilder.field.technology_level')}</dt><dd>{label(resolved.technology_level)}</dd></div>
-                <div><dt>{t('worldBuilder.field.supernatural_boundary')}</dt><dd>{label(resolved.supernatural_boundary)}</dd></div>
-                <div><dt>{t('worldBuilder.mood')}</dt><dd>{label(resolved.mood)}</dd></div>
-              </dl>
-            ) : (
-              <p className="live-page-empty">{t('worldBuilder.previewHint')}</p>
-            )}
-            {(draft.custom_requirements || draft.excluded_content) && (
-              <div className="live-page-notes">
-                {draft.custom_requirements && <p><b>{t('worldBuilder.customRequirements')}</b>{draft.custom_requirements}</p>}
-                {draft.excluded_content && <p><b>{t('worldBuilder.excludedContent')}</b>{draft.excluded_content}</p>}
-              </div>
-            )}
-            <footer>
-              {sourcePreset && (
-                <span>{exactPreset ? t('worldBuilder.presetApplied', { name: tc(`preset.${sourcePreset.id}.label`, { defaultValue: sourcePreset.label }) }) : t('worldBuilder.presetModified', { name: tc(`preset.${sourcePreset.id}.label`, { defaultValue: sourcePreset.label }) })}</span>
+            <div className="world-visual" aria-hidden="true">
+              <span>{selectedFamily ? FAMILY_MARKS[selectedFamily] : '界'}</span>
+              <i />
+              <b>{selectedFamily ? label(selectedFamily) : t('worldBuilder.awaitingWorld')}</b>
+            </div>
+            <div className="world-preview-copy">
+              <span className="live-page-kicker">{t('worldBuilder.livePreview')}</span>
+              <h3>{previewTitle}</h3>
+              <p className="live-page-deck">{previewThemes}</p>
+              {previewResolved ? (
+                <dl>
+                  {previewDetails.slice(0, 6).map((detail) => (
+                    <div key={detail.field}><dt>{fieldLabel(detail.field)}</dt><dd>{label(detail.value)}</dd></div>
+                  ))}
+                  <div><dt>{t('worldBuilder.mood')}</dt><dd>{label(previewResolved.mood)}</dd></div>
+                </dl>
+              ) : (
+                <p className="live-page-empty">{t('worldBuilder.previewHintV2')}</p>
               )}
-              {undoDraft && <button type="button" onClick={() => { setDraft(undoDraft); setUndoDraft(null) }}>{t('worldBuilder.undo')}</button>}
-            </footer>
+              {(draft.custom_requirements || draft.excluded_content) && (
+                <div className="live-page-notes">
+                  {draft.custom_requirements && <p><b>{t('worldBuilder.customRequirements')}</b>{draft.custom_requirements}</p>}
+                  {draft.excluded_content && <p><b>{t('worldBuilder.excludedContent')}</b>{draft.excluded_content}</p>}
+                </div>
+              )}
+              <footer>
+                {sourcePreset && <span>{exactPreset ? t('worldBuilder.presetApplied', { name: tc(`preset.${sourcePreset.id}.label`, { defaultValue: sourcePreset.label }) }) : t('worldBuilder.presetModified', { name: tc(`preset.${sourcePreset.id}.label`, { defaultValue: sourcePreset.label }) })}</span>}
+                {undoDraft && <button type="button" onClick={() => { setDraft(undoDraft); setUndoDraft(null) }}>{t('worldBuilder.undo')}</button>}
+              </footer>
+            </div>
           </aside>
         </div>
 
         <footer className="world-builder-footer">
-          <span>{resolved ? t('worldBuilder.characterSeparate') : t('worldBuilder.requiredHint')}</span>
+          <span>{resolved ? t('worldBuilder.characterSeparate') : t('worldBuilder.requiredHintV2')}</span>
           <button type="button" disabled={!resolved} onClick={continueToCharacter}>{t('worldBuilder.continue')}</button>
         </footer>
       </main>

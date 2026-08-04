@@ -46,14 +46,17 @@ export {
   DEFAULT_TIER_C_TEMPLATES,
 } from './extension-config.js'
 export {
-  QUICK_ARCHETYPE_DEFAULTS,
+  WORLD_FAMILY_DEFAULTS,
   WORLD_BUILDER_CONFIG,
   WORLD_PRESETS,
-  applyQuickWorldArchetype,
+  applyWorldFamily,
   applyWorldPreset,
   createEmptyWorldDraft,
+  getAvailableWorldDetailOptions,
+  getWorldQuestions,
   isDraftBasedOnPreset,
   resolveWorldCreationDraft,
+  updateWorldKernelField,
   worldBriefToStyleConfig,
 } from './world-creation.js'
 export type {
