@@ -26,19 +26,22 @@ import './StyleSelectOverlay.css'
 
 type BuilderMode = 'presets' | 'detailed'
 
+const presetCover = (name: string) =>
+  `${import.meta.env.BASE_URL}assets/world-presets/${name}.webp`
+
 const PRESET_COVERS: Record<string, string> = {
-  modern_city: '/assets/world-presets/modern_city.webp',
-  campus_youth: '/assets/world-presets/campus_youth.webp',
-  cozy_town: '/assets/world-presets/cozy_town.webp',
-  modern_anomaly: '/assets/world-presets/modern_anomaly.webp',
-  ancient_life: '/assets/world-presets/ancient_life.webp',
-  court_politics: '/assets/world-presets/court_politics.webp',
-  wuxia: '/assets/world-presets/wuxia.webp',
-  xianxia: '/assets/world-presets/xianxia.webp',
-  western_kingdom: '/assets/world-presets/western_kingdom.webp',
-  near_future_city: '/assets/world-presets/near_future_city.webp',
-  space_voyage: '/assets/world-presets/space_voyage.webp',
-  post_apocalypse: '/assets/world-presets/post_apocalypse.webp',
+  modern_city: presetCover('modern_city'),
+  campus_youth: presetCover('campus_youth'),
+  cozy_town: presetCover('cozy_town'),
+  modern_anomaly: presetCover('modern_anomaly'),
+  ancient_life: presetCover('ancient_life'),
+  court_politics: presetCover('court_politics'),
+  wuxia: presetCover('wuxia'),
+  xianxia: presetCover('xianxia'),
+  western_kingdom: presetCover('western_kingdom'),
+  near_future_city: presetCover('near_future_city'),
+  space_voyage: presetCover('space_voyage'),
+  post_apocalypse: presetCover('post_apocalypse'),
 }
 
 const FAMILY_COVERS: Record<WorldFamily, string> = {
