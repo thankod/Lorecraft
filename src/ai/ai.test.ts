@@ -82,6 +82,27 @@ That should work.`
     }
   })
 
+  it('skips an empty code block when a later block contains valid JSON', () => {
+    const raw = `
+\`\`\`json
+\`\`\`
+The corrected response is:
+\`\`\`json
+{"action":"observe","target":"loc_square","confidence":0.7}
+\`\`\``
+
+    const result = parser.parse(raw)
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.action).toBe('observe')
+  })
+
+  it('ignores non-JSON brackets in prose before the payload', () => {
+    const raw = '[analysis] use the following result: {"action":"wait","target":"self","confidence":0.4}'
+    const result = parser.parse(raw)
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data.action).toBe('wait')
+  })
+
   it('rejects invalid JSON with INVALID_JSON error type', () => {
     const raw = '{not valid json at all'
     const result = parser.parse(raw)
@@ -90,6 +111,17 @@ That should work.`
     if (!result.success) {
       expect(result.error.type).toBe('INVALID_JSON')
       expect(result.error.message).toContain('Failed to parse JSON')
+      expect(result.error.message).toContain(`raw ${raw.length} chars`)
+      expect(result.error.message).not.toMatch(/JSON:\s*$/)
+    }
+  })
+
+  it('reports explicit lengths for an empty response', () => {
+    const result = parser.parse('')
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.message).toContain('raw 0 chars, extracted 0 chars')
+      expect(result.error.message).toContain('<empty>')
     }
   })
 

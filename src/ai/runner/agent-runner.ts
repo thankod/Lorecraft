@@ -41,6 +41,8 @@ export interface LLMCallDetail {
   response: string
   duration_ms: number
   usage?: TokenUsage
+  finish_reason?: string
+  raw_finish_reason?: string
 }
 
 export class AgentRunner {
@@ -130,6 +132,8 @@ export class AgentRunner {
           response: response.content,
           duration_ms: duration,
           usage: response.usage,
+          finish_reason: response.finish_reason,
+          raw_finish_reason: response.raw_finish_reason,
         })
 
         this.writeDebug(callId, agentType, messages, duration, response.content)

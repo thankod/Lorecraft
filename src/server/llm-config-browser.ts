@@ -40,8 +40,8 @@ export async function testLLMConnection(config: LLMConfig): Promise<{ success: b
   try {
     const provider = createProviderFromConfig(config)
     await provider.call(
-      [{ role: 'user', content: 'Reply with OK' }],
-      { max_tokens: 4, temperature: 0 },
+      [{ role: 'user', content: 'Reply with exactly OK. Do not explain.' }],
+      { max_tokens: 64, temperature: 0 },
     )
     return { success: true, message: '连接成功' }
   } catch (err) {

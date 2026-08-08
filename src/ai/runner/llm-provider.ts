@@ -6,6 +6,8 @@ export interface LLMMessage {
 export interface LLMResponse {
   content: string
   usage?: { input_tokens: number; output_tokens: number }
+  finish_reason?: string
+  raw_finish_reason?: string
 }
 
 export interface ILLMProvider {

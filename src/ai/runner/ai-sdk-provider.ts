@@ -12,6 +12,7 @@ import { createTogetherAI } from '@ai-sdk/togetherai'
 import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock'
 import { createAzure } from '@ai-sdk/azure'
 import type { ILLMProvider, LLMMessage, LLMResponse } from './llm-provider.js'
+import { extractValidJson } from '../parser/json-extraction.js'
 
 export type AISdkProviderType =
   | 'openai'
@@ -57,6 +58,59 @@ const DEFAULT_MODELS: Record<AISdkProviderType, string> = {
   azure: 'gpt-4o-mini',
 }
 
+type OpenAICompatibleResponse = {
+  choices?: Array<{
+    message?: {
+      content?: unknown
+      reasoning_content?: unknown
+    }
+  }>
+}
+
+/**
+ * Some OpenAI-compatible reasoning APIs return the final JSON in
+ * `reasoning_content` while leaving `content` null. The OpenAI provider schema
+ * ignores that vendor field, so recover it before validation — but only when
+ * it is complete, valid JSON. Never surface free-form chain-of-thought.
+ */
+const openAICompatibleFetch: typeof fetch = async (input, init) => {
+  const response = await globalThis.fetch(input, init)
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+    return response
+  }
+
+  let body: OpenAICompatibleResponse
+  try {
+    body = await response.clone().json() as OpenAICompatibleResponse
+  } catch {
+    return response
+  }
+
+  let changed = false
+  for (const choice of body.choices ?? []) {
+    const message = choice.message
+    if (!message) continue
+    const hasFinalContent = typeof message.content === 'string' && message.content.trim().length > 0
+    if (hasFinalContent || typeof message.reasoning_content !== 'string') continue
+    const recovered = extractValidJson(message.reasoning_content)
+    if (!recovered) continue
+    message.content = recovered
+    changed = true
+  }
+
+  if (!changed) return response
+
+  const headers = new Headers(response.headers)
+  headers.delete('content-encoding')
+  headers.delete('content-length')
+  headers.delete('transfer-encoding')
+  return new Response(JSON.stringify(body), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  })
+}
+
 function createModel(options: AISdkProviderOptions): LanguageModel {
   const modelId = options.model || DEFAULT_MODELS[options.provider]
 
@@ -73,6 +127,7 @@ function createModel(options: AISdkProviderOptions): LanguageModel {
       const provider = createOpenAI({
         apiKey: options.apiKey,
         baseURL: options.baseURL,
+        fetch: openAICompatibleFetch,
       })
       return provider.chat(modelId)
     }
@@ -152,8 +207,22 @@ export class AISdkProvider implements ILLMProvider {
       ...(options?.temperature !== undefined && { temperature: options.temperature }),
     })
 
+    const content = result.text.trim().length > 0
+      ? result.text
+      : extractValidJson(result.reasoningText ?? '')
+
+    if (!content) {
+      const reasoningLength = result.reasoningText?.length ?? 0
+      const rawFinish = result.rawFinishReason ? `/${result.rawFinishReason}` : ''
+      throw new Error(
+        `LLM returned no usable final text (finish=${result.finishReason}${rawFinish}, output_tokens=${result.usage.outputTokens ?? 0}, reasoning_chars=${reasoningLength})`,
+      )
+    }
+
     return {
-      content: result.text,
+      content,
+      finish_reason: result.finishReason,
+      raw_finish_reason: result.rawFinishReason,
       usage: result.usage
         ? {
             input_tokens: result.usage.inputTokens ?? 0,

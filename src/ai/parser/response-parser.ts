@@ -1,4 +1,5 @@
 import type { z } from 'zod/v4'
+import { extractJson } from './json-extraction.js'
 
 export interface ParseError {
   type: 'INVALID_JSON' | 'SCHEMA_VIOLATION' | 'ENUM_VIOLATION'
@@ -17,7 +18,7 @@ export class ResponseParser<T> {
   }
 
   parse(raw: string): ParseResult<T> {
-    const json = this.extractJson(raw)
+    const json = extractJson(raw)
 
     let parsed: unknown
     try {
@@ -27,7 +28,7 @@ export class ResponseParser<T> {
         success: false,
         error: {
           type: 'INVALID_JSON',
-          message: `Failed to parse JSON: ${json.slice(0, 200)}`,
+          message: `Failed to parse JSON (raw ${raw.length} chars, extracted ${json.length} chars): ${json.slice(0, 200) || '<empty>'}`,
         },
       }
     }
@@ -64,20 +65,4 @@ export class ResponseParser<T> {
     }
   }
 
-  private extractJson(raw: string): string {
-    // Try to extract from ```json ... ``` code block
-    const codeBlockMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/)
-    if (codeBlockMatch) {
-      return codeBlockMatch[1].trim()
-    }
-
-    // Try to find a JSON object or array directly
-    const jsonMatch = raw.match(/(\{[\s\S]*\}|\[[\s\S]*\])/)
-    if (jsonMatch) {
-      return jsonMatch[1]
-    }
-
-    // Return raw as-is, let JSON.parse handle the error
-    return raw.trim()
-  }
 }

@@ -1,5 +1,6 @@
 import type { AgentRunner } from '../../ai/runner/agent-runner.js'
 import { ResponseParser } from '../../ai/parser/response-parser.js'
+import { extractJson } from '../../ai/parser/json-extraction.js'
 import { prompts } from '../../ai/prompt/prompts.js'
 import type {
   IStateStore,
@@ -297,14 +298,7 @@ export class InitializationAgent {
    * - Normalize enum values to uppercase
    */
   private preprocessLLMOutput(raw: string): string {
-    // Extract JSON first
-    const codeBlockMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/)
-    let jsonStr = codeBlockMatch ? codeBlockMatch[1].trim() : raw
-
-    const jsonMatch = jsonStr.match(/(\{[\s\S]*\})/)
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1]
-    }
+    const jsonStr = extractJson(raw)
 
     let parsed: Record<string, unknown>
     try {
