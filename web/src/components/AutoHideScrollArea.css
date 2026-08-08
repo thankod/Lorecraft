@@ -1,0 +1,77 @@
+.auto-hide-scroll-area {
+  --auto-scrollbar-size: 10px;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.auto-hide-scroll-viewport {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.auto-hide-scrollbar {
+  z-index: 8;
+  display: flex;
+  padding: 2px;
+  touch-action: none;
+  user-select: none;
+  opacity: 1;
+  transition: opacity 160ms var(--ease-out), background 160ms var(--ease-out);
+}
+
+.auto-hide-scrollbar[data-state='hidden'] {
+  opacity: 0;
+}
+
+.auto-hide-scrollbar[data-orientation='vertical'] {
+  width: var(--auto-scrollbar-size);
+}
+
+.auto-hide-scrollbar[data-orientation='horizontal'] {
+  height: var(--auto-scrollbar-size);
+  flex-direction: column;
+}
+
+.auto-hide-scrollbar:hover {
+  background: rgb(var(--title-rgb) / 0.035);
+}
+
+.auto-hide-scroll-thumb {
+  position: relative;
+  flex: 1;
+  background: var(--scrollbar-thumb-hover);
+  border-radius: 999px;
+  opacity: 0.72;
+  transition: opacity 140ms var(--ease-out), background 140ms var(--ease-out);
+}
+
+.auto-hide-scroll-thumb:hover,
+.auto-hide-scroll-thumb:active {
+  background: var(--title-dim);
+  opacity: 0.92;
+}
+
+/* Keep the visible rail delicate while preserving a comfortable drag target. */
+.auto-hide-scroll-thumb::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  min-width: 28px;
+  height: 100%;
+  min-height: 28px;
+  transform: translate(-50%, -50%);
+}
+
+.auto-hide-scroll-corner {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auto-hide-scrollbar,
+  .auto-hide-scroll-thumb { transition: none; }
+}

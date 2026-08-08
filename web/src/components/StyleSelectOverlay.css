@@ -1,51 +1,19 @@
-.world-builder,
-.world-builder * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) transparent;
+.world-builder-scroll {
+  min-height: 0;
 }
 
-.world-builder::-webkit-scrollbar,
-.world-builder *::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+.world-builder-scroll-viewport {
+  width: 100%;
+  height: 100%;
 }
 
-.world-builder::-webkit-scrollbar-track,
-.world-builder *::-webkit-scrollbar-track,
-.world-builder::-webkit-scrollbar-track-piece,
-.world-builder *::-webkit-scrollbar-track-piece {
-  background: transparent;
-}
-
-.world-builder::-webkit-scrollbar-thumb,
-.world-builder *::-webkit-scrollbar-thumb {
-  min-width: 32px;
-  min-height: 32px;
-  background: var(--scrollbar-thumb);
-  background-clip: padding-box;
-  border: 2px solid transparent;
-  border-radius: 999px;
-}
-
-.world-builder::-webkit-scrollbar-thumb:hover,
-.world-builder *::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
-  background-clip: padding-box;
-}
-
-.world-builder::-webkit-scrollbar-button,
-.world-builder *::-webkit-scrollbar-button {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-.world-builder::-webkit-scrollbar-corner,
-.world-builder *::-webkit-scrollbar-corner {
-  background: transparent;
+.world-builder-scroll-viewport > div {
+  height: 100%;
+  display: block !important;
 }
 
 .world-builder-body {
+  height: 100%;
   min-height: 0;
   display: grid;
   grid-template-areas: 'settings preview';
@@ -123,11 +91,20 @@
 }
 
 .preset-scroll {
-  min-width: 0;
+  width: max-content;
+  min-width: 100%;
   display: flex;
   gap: 8px;
-  overflow-x: auto;
-  padding: 1px 1px 5px;
+  padding: 1px 1px 9px;
+}
+
+.preset-scroll-area {
+  width: 100%;
+  height: 64px;
+}
+
+.preset-scroll-area .auto-hide-scrollbar[data-orientation='horizontal'] {
+  height: 8px;
 }
 
 .preset-scroll button {
@@ -194,11 +171,12 @@
   white-space: nowrap;
 }
 
-.world-controls {
+.world-controls-scroll {
   min-height: 0;
-  overflow-y: auto;
+}
+
+.world-controls {
   padding: 18px 24px 28px;
-  scrollbar-gutter: stable;
   animation: worldControlsIn 220ms var(--ease-candle);
 }
 
@@ -463,7 +441,11 @@
 }
 
 .free-text-section legend { grid-column: 1 / -1; }
-.free-text-section textarea { resize: vertical; line-height: 1.55; }
+.free-text-section textarea {
+  overflow: hidden;
+  resize: none;
+  line-height: 1.55;
+}
 .free-text-section textarea::placeholder { color: var(--fg-muted); opacity: 0.55; }
 
 /* Right-hand summary: compact, useful and visually native to the settings UI. */
@@ -536,15 +518,21 @@
   text-transform: uppercase;
 }
 
-.world-preview-copy {
+.world-preview-scroll {
   min-height: 0;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  padding: 20px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: 0 1px 0 var(--edge-highlight-sm) inset;
+}
+
+.world-preview-viewport > div {
+  min-height: 100%;
+}
+
+.world-preview-copy {
+  min-height: 100%;
+  padding: 20px;
 }
 
 .live-page-kicker {
@@ -645,10 +633,16 @@
 }
 
 @container world-builder (max-width: 58rem) {
+  .world-builder-scroll-viewport > div {
+    height: auto;
+    min-height: 100%;
+  }
+
   .world-builder-body {
+    height: auto;
+    min-height: 100%;
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
   }
 
   .world-live-page {
@@ -663,7 +657,8 @@
   }
 
   .world-visual { min-height: 104px; }
-  .world-preview-copy { max-height: 104px; padding: 14px 16px; overflow: hidden; }
+  .world-preview-scroll { height: 104px; }
+  .world-preview-copy { padding: 14px 16px; }
   .world-preview-copy h3 { margin-top: 8px; }
   .world-live-page dl,
   .world-live-page .live-page-notes { display: none; }
@@ -675,7 +670,17 @@
     overflow: visible;
   }
 
-  .world-controls { overflow: visible; }
+  .world-controls-scroll {
+    height: auto;
+    overflow: visible;
+  }
+
+  .world-controls-viewport {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .world-controls-scroll > .auto-hide-scrollbar { display: none; }
 }
 
 @container world-builder (max-width: 42rem) {

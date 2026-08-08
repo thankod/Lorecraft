@@ -252,9 +252,13 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   outline: none;
-  resize: vertical;
   font: var(--text-small)/1.55 var(--font-ui);
   transition: border-color var(--duration-normal), box-shadow var(--duration-normal);
+}
+
+.identity-fields textarea {
+  overflow: hidden;
+  resize: none;
 }
 
 .identity-fields input::placeholder,

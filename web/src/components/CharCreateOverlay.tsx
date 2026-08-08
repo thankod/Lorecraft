@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import TextareaAutosize from 'react-textarea-autosize'
 import { useGameStore } from '../stores/useGameStore'
 import { useT } from '../i18n'
 import type { CharCreateState } from '../stores/useGameStore'
@@ -181,7 +182,7 @@ function CharCreatePanel({
                   </label>
                   <label className="wide">
                     <span>{t('backgroundLabel')} <small>{t('optional')}</small></span>
-                    <textarea maxLength={500} rows={3} value={profile.background_seed ?? ''} onChange={(event) => updateProfile('background_seed', event.target.value)} placeholder={t('backgroundPlaceholder')} />
+                    <TextareaAutosize maxLength={500} minRows={3} value={profile.background_seed ?? ''} onChange={(event) => updateProfile('background_seed', event.target.value)} placeholder={t('backgroundPlaceholder')} />
                   </label>
                 </div>
               </section>

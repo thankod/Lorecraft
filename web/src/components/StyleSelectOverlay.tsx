@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import TextareaAutosize from 'react-textarea-autosize'
 import type {
   StoryMood,
   StoryTheme,
@@ -18,6 +19,7 @@ import {
 } from '@engine/domain/services/world-creation'
 import { useGameStore } from '../stores/useGameStore'
 import { useT } from '../i18n'
+import { AutoHideScrollArea } from './AutoHideScrollArea'
 import './CreationFlow.css'
 import './StyleSelectOverlay.css'
 
@@ -177,6 +179,7 @@ export function StyleSelectOverlay() {
           <button className="world-builder-close" onClick={() => useGameStore.getState().setWorldBuilderConfig(null)} aria-label={t('worldBuilder.close')}>&#10005;</button>
         </header>
 
+        <AutoHideScrollArea className="world-builder-scroll" viewportClassName="world-builder-scroll-viewport">
         <div className="world-builder-body">
           <section className="world-settings-panel">
             <div className="builder-mode-tabs" role="tablist" aria-label={t('worldBuilder.modeLabel')}>
@@ -190,6 +193,7 @@ export function StyleSelectOverlay() {
 
             <div className="preset-shelf" aria-label={t('worldBuilder.presets')}>
               <div className="preset-shelf-label"><span>{t('worldBuilder.presets')}</span></div>
+              <AutoHideScrollArea className="preset-scroll-area" viewportClassName="preset-scroll-viewport" orientation="horizontal">
               <div className="preset-scroll">
                 {config.presets.map((preset, index) => {
                   const family = preset.draft.kernel?.family
@@ -208,8 +212,10 @@ export function StyleSelectOverlay() {
                   )
                 })}
               </div>
+              </AutoHideScrollArea>
             </div>
 
+            <AutoHideScrollArea className="world-controls-scroll" viewportClassName="world-controls-viewport">
             <section className="world-controls" key={mode}>
             <fieldset className="builder-section family-section">
               <legend><b>01</b>{t('worldBuilder.archetype')}</legend>
@@ -284,15 +290,16 @@ export function StyleSelectOverlay() {
                 <legend><b>05</b>{t('worldBuilder.finalTouches')}</legend>
                 <label>
                   <span>{t('worldBuilder.customRequirements')}</span>
-                  <textarea maxLength={500} rows={3} value={draft.custom_requirements} onChange={(event) => updateField('custom_requirements', event.target.value)} placeholder={t('worldBuilder.customPlaceholderV2')} />
+                  <TextareaAutosize maxLength={500} minRows={3} value={draft.custom_requirements} onChange={(event) => updateField('custom_requirements', event.target.value)} placeholder={t('worldBuilder.customPlaceholderV2')} />
                 </label>
                 <label>
                   <span>{t('worldBuilder.excludedContent')}</span>
-                  <textarea maxLength={500} rows={2} value={draft.excluded_content} onChange={(event) => updateField('excluded_content', event.target.value)} placeholder={t('worldBuilder.excludedPlaceholder')} />
+                  <TextareaAutosize maxLength={500} minRows={2} value={draft.excluded_content} onChange={(event) => updateField('excluded_content', event.target.value)} placeholder={t('worldBuilder.excludedPlaceholder')} />
                 </label>
               </fieldset>
             )}
             </section>
+            </AutoHideScrollArea>
           </section>
 
           <aside className="world-live-page" aria-live="polite">
@@ -301,6 +308,7 @@ export function StyleSelectOverlay() {
               <i />
               <b>{selectedFamily ? label(selectedFamily) : t('worldBuilder.awaitingWorld')}</b>
             </div>
+            <AutoHideScrollArea className="world-preview-scroll" viewportClassName="world-preview-viewport">
             <div className="world-preview-copy">
               <span className="live-page-kicker">{t('worldBuilder.livePreview')}</span>
               <h3>{previewTitle}</h3>
@@ -324,9 +332,10 @@ export function StyleSelectOverlay() {
                 {undoDraft && <button type="button" onClick={() => { setDraft(undoDraft); setUndoDraft(null) }}>{t('worldBuilder.undo')}</button>}
               </footer>
             </div>
+            </AutoHideScrollArea>
           </aside>
         </div>
-
+        </AutoHideScrollArea>
         <footer className="world-builder-footer">
           {!resolved && <span>{t('worldBuilder.requiredHintV2')}</span>}
           <button type="button" disabled={!resolved} onClick={continueToCharacter}>{t('worldBuilder.continue')}</button>
