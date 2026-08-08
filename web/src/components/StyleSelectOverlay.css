@@ -1,3 +1,50 @@
+.world-builder,
+.world-builder * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.world-builder::-webkit-scrollbar,
+.world-builder *::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+.world-builder::-webkit-scrollbar-track,
+.world-builder *::-webkit-scrollbar-track,
+.world-builder::-webkit-scrollbar-track-piece,
+.world-builder *::-webkit-scrollbar-track-piece {
+  background: transparent;
+}
+
+.world-builder::-webkit-scrollbar-thumb,
+.world-builder *::-webkit-scrollbar-thumb {
+  min-width: 32px;
+  min-height: 32px;
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+.world-builder::-webkit-scrollbar-thumb:hover,
+.world-builder *::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+.world-builder::-webkit-scrollbar-button,
+.world-builder *::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.world-builder::-webkit-scrollbar-corner,
+.world-builder *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .world-builder-body {
   min-height: 0;
   display: grid;
@@ -81,15 +128,6 @@
   gap: 8px;
   overflow-x: auto;
   padding: 1px 1px 5px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) transparent;
-}
-
-.preset-scroll::-webkit-scrollbar { height: 5px; }
-.preset-scroll::-webkit-scrollbar-track { background: transparent; }
-.preset-scroll::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 3px;
 }
 
 .preset-scroll button {
@@ -160,7 +198,7 @@
   min-height: 0;
   overflow-y: auto;
   padding: 18px 24px 28px;
-  scrollbar-width: thin;
+  scrollbar-gutter: stable;
   animation: worldControlsIn 220ms var(--ease-candle);
 }
 
@@ -501,6 +539,7 @@
 .world-preview-copy {
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 20px;
   background: var(--bg);
   border: 1px solid var(--border);
