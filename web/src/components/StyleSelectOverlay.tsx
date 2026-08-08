@@ -6,6 +6,7 @@ import type {
   WorldCreationDraft,
   WorldFamily,
   WorldKernelDraft,
+  WorldPresetDefinition,
 } from '@engine/domain/models/world-creation'
 import { WorldCreationDraftSchema } from '@engine/domain/models/world-creation'
 import {
@@ -23,7 +24,33 @@ import { AutoHideScrollArea } from './AutoHideScrollArea'
 import './CreationFlow.css'
 import './StyleSelectOverlay.css'
 
-type BuilderMode = 'quick' | 'detailed'
+type BuilderMode = 'presets' | 'detailed'
+
+const PRESET_COVERS: Record<string, string> = {
+  modern_city: '/assets/world-presets/modern_city.webp',
+  campus_youth: '/assets/world-presets/campus_youth.webp',
+  cozy_town: '/assets/world-presets/cozy_town.webp',
+  modern_anomaly: '/assets/world-presets/modern_anomaly.webp',
+  ancient_life: '/assets/world-presets/ancient_life.webp',
+  court_politics: '/assets/world-presets/court_politics.webp',
+  wuxia: '/assets/world-presets/wuxia.webp',
+  xianxia: '/assets/world-presets/xianxia.webp',
+  western_kingdom: '/assets/world-presets/western_kingdom.webp',
+  near_future_city: '/assets/world-presets/near_future_city.webp',
+  space_voyage: '/assets/world-presets/space_voyage.webp',
+  post_apocalypse: '/assets/world-presets/post_apocalypse.webp',
+}
+
+const FAMILY_COVERS: Record<WorldFamily, string> = {
+  CONTEMPORARY: PRESET_COVERS.modern_city,
+  MODERN_ANOMALY: PRESET_COVERS.modern_anomaly,
+  HISTORICAL: PRESET_COVERS.ancient_life,
+  WUXIA: PRESET_COVERS.wuxia,
+  EASTERN_FANTASY: PRESET_COVERS.xianxia,
+  WESTERN_FANTASY: PRESET_COVERS.western_kingdom,
+  SCIENCE_FICTION: PRESET_COVERS.near_future_city,
+  POST_COLLAPSE: PRESET_COVERS.post_apocalypse,
+}
 
 const FAMILY_MARKS: Record<WorldFamily, string> = {
   CONTEMPORARY: '今',
@@ -45,7 +72,7 @@ export function StyleSelectOverlay() {
   const tc = useT('config')
   const config = useGameStore((state) => state.worldBuilderConfig)
   const send = useGameStore((state) => state.send)
-  const [mode, setMode] = useState<BuilderMode>('quick')
+  const [mode, setMode] = useState<BuilderMode>('presets')
   const [draft, setDraft] = useState<WorldCreationDraft>(() => createEmptyWorldDraft())
   const [undoDraft, setUndoDraft] = useState<WorldCreationDraft | null>(null)
 
@@ -73,6 +100,7 @@ export function StyleSelectOverlay() {
     ? config.presets.find((preset) => preset.id === draft.source_preset_id) ?? null
     : null
   const exactPreset = sourcePreset ? isDraftBasedOnPreset(draft, sourcePreset) : false
+  const featuredPresets = config.presets.filter((preset) => PRESET_COVERS[preset.id])
 
   function label(value: string): string {
     const fallback = value
@@ -100,9 +128,15 @@ export function StyleSelectOverlay() {
     setDraft(next)
   }
 
-  function choosePreset(index: number) {
-    const preset = config!.presets[index]
-    if (preset) rememberAndSet(applyWorldPreset(draft, preset))
+  function choosePreset(preset: WorldPresetDefinition) {
+    rememberAndSet(applyWorldPreset(draft, preset))
+  }
+
+  function showDetailedSettings() {
+    if (!draft.kernel && featuredPresets[0]) {
+      rememberAndSet(applyWorldPreset(draft, featuredPresets[0]))
+    }
+    setMode('detailed')
   }
 
   function chooseFamily(family: WorldFamily) {
@@ -156,6 +190,11 @@ export function StyleSelectOverlay() {
   const previewThemes = draft.primary_theme
     ? [draft.primary_theme, draft.secondary_theme].filter(Boolean).map((theme) => label(theme!)).join(t('worldBuilder.joiner') as string)
     : t('worldBuilder.previewEmptyThemes')
+  const previewCover = sourcePreset
+    ? PRESET_COVERS[sourcePreset.id]
+    : selectedFamily
+      ? FAMILY_COVERS[selectedFamily]
+      : null
 
   return (
     <div className="style-overlay">
@@ -180,43 +219,48 @@ export function StyleSelectOverlay() {
         </header>
 
         <AutoHideScrollArea className="world-builder-scroll" viewportClassName="world-builder-scroll-viewport">
-        <div className="world-builder-body">
-          <section className="world-settings-panel">
-            <div className="builder-mode-tabs" role="tablist" aria-label={t('worldBuilder.modeLabel')}>
-              <button type="button" role="tab" aria-selected={mode === 'quick'} className={mode === 'quick' ? 'active' : ''} onClick={() => setMode('quick')}>
+          <div className="world-builder-body">
+            <nav className="builder-mode-tabs" role="tablist" aria-label={t('worldBuilder.modeLabel')}>
+              <button type="button" role="tab" aria-selected={mode === 'presets'} className={mode === 'presets' ? 'active' : ''} onClick={() => setMode('presets')}>
                 <span>{t('worldBuilder.quick')}</span>
               </button>
-              <button type="button" role="tab" aria-selected={mode === 'detailed'} className={mode === 'detailed' ? 'active' : ''} onClick={() => setMode('detailed')}>
+              <button type="button" role="tab" aria-selected={mode === 'detailed'} className={mode === 'detailed' ? 'active' : ''} onClick={showDetailedSettings}>
                 <span>{t('worldBuilder.detailed')}</span>
               </button>
-            </div>
+            </nav>
 
-            <div className="preset-shelf" aria-label={t('worldBuilder.presets')}>
-              <div className="preset-shelf-label"><span>{t('worldBuilder.presets')}</span></div>
-              <AutoHideScrollArea className="preset-scroll-area" viewportClassName="preset-scroll-viewport" orientation="horizontal">
-              <div className="preset-scroll">
-                {config.presets.map((preset, index) => {
-                  const family = preset.draft.kernel?.family
-                  return (
-                    <button
-                      type="button"
-                      key={preset.id}
-                      data-family={family}
-                      className={sourcePreset?.id === preset.id ? 'selected' : ''}
-                      onClick={() => choosePreset(index)}
-                    >
-                      <i aria-hidden="true">{family ? FAMILY_MARKS[family] : ''}</i>
-                      <span>{tc(`preset.${preset.id}.label`, { defaultValue: preset.label })}</span>
-                      <small>{tc(`preset.${preset.id}.description`, { defaultValue: preset.description })}</small>
-                    </button>
-                  )
-                })}
-              </div>
+            {mode === 'presets' ? (
+              <AutoHideScrollArea className="preset-page-scroll" viewportClassName="preset-page-viewport">
+                <section className="preset-page" aria-label={t('worldBuilder.presets')}>
+                  <div className="preset-gallery">
+                    {featuredPresets.map((preset, index) => {
+                      const selected = sourcePreset?.id === preset.id
+                      return (
+                        <button
+                          type="button"
+                          key={preset.id}
+                          className={`preset-card${selected ? ' selected' : ''}`}
+                          aria-pressed={selected}
+                          onClick={() => choosePreset(preset)}
+                          style={{ animationDelay: `${index * 24}ms` }}
+                        >
+                          <img src={PRESET_COVERS[preset.id]} alt="" draggable="false" />
+                          <span className="preset-card-shade" aria-hidden="true" />
+                          <span className="preset-card-copy">
+                            <b>{tc(`preset.${preset.id}.label`, { defaultValue: preset.label })}</b>
+                            <small>{tc(`preset.${preset.id}.description`, { defaultValue: preset.description })}</small>
+                          </span>
+                          <i className="preset-card-state" aria-hidden="true">{selected ? '✓' : String(index + 1).padStart(2, '0')}</i>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
               </AutoHideScrollArea>
-            </div>
-
-            <AutoHideScrollArea className="world-controls-scroll" viewportClassName="world-controls-viewport">
-            <section className="world-controls" key={mode}>
+            ) : (
+              <section className="world-detailed-page">
+                <AutoHideScrollArea className="world-controls-scroll" viewportClassName="world-controls-viewport">
+                  <section className="world-controls">
             <fieldset className="builder-section family-section">
               <legend><b>01</b>{t('worldBuilder.archetype')}</legend>
               <div className="family-grid">
@@ -259,7 +303,7 @@ export function StyleSelectOverlay() {
             )}
 
             <fieldset className="builder-section theme-section">
-              <legend><b>{mode === 'quick' ? '02' : '03'}</b>{t('worldBuilder.themes')}</legend>
+              <legend><b>03</b>{t('worldBuilder.themes')}</legend>
               <p>{t('worldBuilder.themesHint')}</p>
               <div className="theme-cloud">
                 {config.catalogs.themes.map((theme) => {
@@ -275,7 +319,7 @@ export function StyleSelectOverlay() {
             </fieldset>
 
             <fieldset className="builder-section mood-section">
-              <legend><b>{mode === 'quick' ? '03' : '04'}</b>{t('worldBuilder.mood')}</legend>
+              <legend><b>04</b>{t('worldBuilder.mood')}</legend>
               <div className="mood-line">
                 {config.catalogs.moods.map((mood) => (
                   <button type="button" key={mood} className={draft.mood === mood ? 'selected' : ''} onClick={() => updateField('mood', mood as StoryMood)}>
@@ -285,59 +329,58 @@ export function StyleSelectOverlay() {
               </div>
             </fieldset>
 
-            {mode === 'detailed' && (
-              <fieldset className="builder-section free-text-section">
-                <legend><b>05</b>{t('worldBuilder.finalTouches')}</legend>
-                <label>
-                  <span>{t('worldBuilder.customRequirements')}</span>
-                  <TextareaAutosize maxLength={500} minRows={3} value={draft.custom_requirements} onChange={(event) => updateField('custom_requirements', event.target.value)} placeholder={t('worldBuilder.customPlaceholderV2')} />
-                </label>
-                <label>
-                  <span>{t('worldBuilder.excludedContent')}</span>
-                  <TextareaAutosize maxLength={500} minRows={2} value={draft.excluded_content} onChange={(event) => updateField('excluded_content', event.target.value)} placeholder={t('worldBuilder.excludedPlaceholder')} />
-                </label>
-              </fieldset>
-            )}
-            </section>
-            </AutoHideScrollArea>
-          </section>
+                    <fieldset className="builder-section free-text-section">
+                      <legend><b>05</b>{t('worldBuilder.finalTouches')}</legend>
+                      <label>
+                        <span>{t('worldBuilder.customRequirements')}</span>
+                        <TextareaAutosize maxLength={500} minRows={3} value={draft.custom_requirements} onChange={(event) => updateField('custom_requirements', event.target.value)} placeholder={t('worldBuilder.customPlaceholderV2')} />
+                      </label>
+                      <label>
+                        <span>{t('worldBuilder.excludedContent')}</span>
+                        <TextareaAutosize maxLength={500} minRows={3} value={draft.excluded_content} onChange={(event) => updateField('excluded_content', event.target.value)} placeholder={t('worldBuilder.excludedPlaceholder')} />
+                      </label>
+                    </fieldset>
+                  </section>
+                </AutoHideScrollArea>
 
-          <aside className="world-live-page" aria-live="polite">
-            <div className="world-visual" aria-hidden="true">
-              <span>{selectedFamily ? FAMILY_MARKS[selectedFamily] : '界'}</span>
-              <i />
-              <b>{selectedFamily ? label(selectedFamily) : t('worldBuilder.awaitingWorld')}</b>
-            </div>
-            <AutoHideScrollArea className="world-preview-scroll" viewportClassName="world-preview-viewport">
-            <div className="world-preview-copy">
-              <span className="live-page-kicker">{t('worldBuilder.livePreview')}</span>
-              <h3>{previewTitle}</h3>
-              <p className="live-page-deck">{previewThemes}</p>
-              {previewResolved && (
-                <dl>
-                  {previewDetails.slice(0, 6).map((detail) => (
-                    <div key={detail.field}><dt>{fieldLabel(detail.field)}</dt><dd>{label(detail.value)}</dd></div>
-                  ))}
-                  <div><dt>{t('worldBuilder.mood')}</dt><dd>{label(previewResolved.mood)}</dd></div>
-                </dl>
-              )}
-              {(draft.custom_requirements || draft.excluded_content) && (
-                <div className="live-page-notes">
-                  {draft.custom_requirements && <p><b>{t('worldBuilder.customRequirements')}</b>{draft.custom_requirements}</p>}
-                  {draft.excluded_content && <p><b>{t('worldBuilder.excludedContent')}</b>{draft.excluded_content}</p>}
-                </div>
-              )}
-              <footer>
-                {sourcePreset && <span>{exactPreset ? t('worldBuilder.presetApplied', { name: tc(`preset.${sourcePreset.id}.label`, { defaultValue: sourcePreset.label }) }) : t('worldBuilder.presetModified', { name: tc(`preset.${sourcePreset.id}.label`, { defaultValue: sourcePreset.label }) })}</span>}
-                {undoDraft && <button type="button" onClick={() => { setDraft(undoDraft); setUndoDraft(null) }}>{t('worldBuilder.undo')}</button>}
-              </footer>
-            </div>
-            </AutoHideScrollArea>
-          </aside>
-        </div>
+                <aside className="world-live-page" aria-live="polite">
+                  <div className="world-visual" aria-hidden="true">
+                    {previewCover && <img src={previewCover} alt="" />}
+                    <span>{selectedFamily ? FAMILY_MARKS[selectedFamily] : '界'}</span>
+                    <b>{selectedFamily ? label(selectedFamily) : t('worldBuilder.awaitingWorld')}</b>
+                  </div>
+                  <AutoHideScrollArea className="world-preview-scroll" viewportClassName="world-preview-viewport">
+                    <div className="world-preview-copy">
+                      <span className="live-page-kicker">{t('worldBuilder.livePreview')}</span>
+                      <h3>{previewTitle}</h3>
+                      <p className="live-page-deck">{previewThemes}</p>
+                      {previewResolved && (
+                        <dl>
+                          {previewDetails.slice(0, 6).map((detail) => (
+                            <div key={detail.field}><dt>{fieldLabel(detail.field)}</dt><dd>{label(detail.value)}</dd></div>
+                          ))}
+                          <div><dt>{t('worldBuilder.mood')}</dt><dd>{label(previewResolved.mood)}</dd></div>
+                        </dl>
+                      )}
+                      {(draft.custom_requirements || draft.excluded_content) && (
+                        <div className="live-page-notes">
+                          {draft.custom_requirements && <p><b>{t('worldBuilder.customRequirements')}</b>{draft.custom_requirements}</p>}
+                          {draft.excluded_content && <p><b>{t('worldBuilder.excludedContent')}</b>{draft.excluded_content}</p>}
+                        </div>
+                      )}
+                      <footer>
+                        {sourcePreset && <span>{exactPreset ? t('worldBuilder.presetApplied', { name: tc(`preset.${sourcePreset.id}.label`, { defaultValue: sourcePreset.label }) }) : t('worldBuilder.presetModified', { name: tc(`preset.${sourcePreset.id}.label`, { defaultValue: sourcePreset.label }) })}</span>}
+                        {undoDraft && <button type="button" onClick={() => { setDraft(undoDraft); setUndoDraft(null) }}>{t('worldBuilder.undo')}</button>}
+                      </footer>
+                    </div>
+                  </AutoHideScrollArea>
+                </aside>
+              </section>
+            )}
+          </div>
         </AutoHideScrollArea>
         <footer className="world-builder-footer">
-          {!resolved && <span>{t('worldBuilder.requiredHintV2')}</span>}
+          {!resolved && <span>{t(mode === 'presets' ? 'worldBuilder.presetRequiredHint' : 'worldBuilder.requiredHintV2')}</span>}
           <button type="button" disabled={!resolved} onClick={continueToCharacter}>{t('worldBuilder.continue')}</button>
         </footer>
       </main>
